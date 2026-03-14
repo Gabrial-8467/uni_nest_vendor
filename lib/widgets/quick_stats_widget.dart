@@ -13,11 +13,11 @@ class QuickStatsWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Color(0x0D000000), // Black with 5% opacity
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -39,7 +39,7 @@ class QuickStatsWidget extends StatelessWidget {
             crossAxisCount: 2,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.2,
             children: [
               _buildStatItem(
                 'Today\'s Revenue',
@@ -56,14 +56,11 @@ class QuickStatsWidget extends StatelessWidget {
                 '+8.2%',
               ),
               _buildStatItem(
-                'Active Products',
-                vendorProvider.products
-                    .where((p) => p.isAvailable)
-                    .length
-                    .toString(),
-                Icons.inventory,
-                Colors.orange,
-                '+2 new',
+                'Weekly Revenue',
+                '₹${vendorProvider.weeklyRevenue.toStringAsFixed(2)}',
+                Icons.trending_up,
+                Colors.green,
+                '+8.2%',
               ),
               _buildStatItem(
                 'Pending Orders',
@@ -87,7 +84,7 @@ class QuickStatsWidget extends StatelessWidget {
     String change,
   ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
@@ -95,17 +92,19 @@ class QuickStatsWidget extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
           Text(
             title,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               color: Colors.grey[600],
               fontWeight: FontWeight.w500,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
@@ -115,21 +114,25 @@ class QuickStatsWidget extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: Color(0xFF2D3436),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               change,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

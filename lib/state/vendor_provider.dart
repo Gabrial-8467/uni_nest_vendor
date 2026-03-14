@@ -604,6 +604,17 @@ class VendorProvider extends ChangeNotifier {
     return todayOrders.fold(0.0, (sum, order) => sum + order.finalAmount);
   }
 
+  // Get weekly revenue
+  double get weeklyRevenue {
+    final now = DateTime.now();
+    final weekStart = now.subtract(const Duration(days: 7));
+    final weekOrders = _orders.where((order) {
+      return order.createdAt.isAfter(weekStart);
+    }).toList();
+
+    return weekOrders.fold(0.0, (sum, order) => sum + order.finalAmount);
+  }
+
   // Clear errors
   void clearErrors() {
     _error = null;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../state/vendor_provider.dart';
+import '../utils/app_theme.dart';
 
 class RevenueChartWidget extends StatelessWidget {
   final VendorProvider vendorProvider;
@@ -14,11 +15,11 @@ class RevenueChartWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Color(0x0D000000), // Black with 5% opacity
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -27,11 +28,7 @@ class RevenueChartWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.analytics_outlined,
-                color: Color(0xFFFF6B6B),
-                size: 20,
-              ),
+              Icon(Icons.analytics_outlined, color: AppTheme.primary, size: 20),
               const SizedBox(width: 8),
               const Text(
                 'Revenue Overview',
@@ -48,7 +45,7 @@ class RevenueChartWidget extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -56,7 +53,7 @@ class RevenueChartWidget extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFFF6B6B),
+                    color: AppTheme.primary,
                   ),
                 ),
               ),
@@ -115,8 +112,11 @@ class RevenueChartWidget extends StatelessWidget {
                   LineChartBarData(
                     spots: _getRevenueSpots(),
                     isCurved: true,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primary,
+                        AppTheme.primary.withValues(alpha: 0.8),
+                      ],
                     ),
                     barWidth: 3,
                     isStrokeCapRound: true,
@@ -125,8 +125,8 @@ class RevenueChartWidget extends StatelessWidget {
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFFFF6B6B).withValues(alpha: 0.3),
-                          const Color(0xFFFF6B6B).withValues(alpha: 0.0),
+                          AppTheme.primary.withValues(alpha: 0.3),
+                          AppTheme.primary.withValues(alpha: 0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,

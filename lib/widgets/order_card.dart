@@ -1,116 +1,14 @@
 import 'package:flutter/material.dart';
-import '../state/vendor_provider.dart';
 import '../models/vendor_models.dart';
 import '../utils/app_theme.dart';
 
-class RecentOrdersWidget extends StatelessWidget {
-  final VendorProvider vendorProvider;
+class OrderCard extends StatelessWidget {
+  final Order order;
 
-  const RecentOrdersWidget({super.key, required this.vendorProvider});
+  const OrderCard({super.key, required this.order});
 
   @override
   Widget build(BuildContext context) {
-    final recentOrders = vendorProvider.getTodayOrders().take(5).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000), // Black with 5% opacity
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.receipt_long_outlined,
-                color: AppTheme.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Recent Orders',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () {
-                  // Navigate to all orders
-                },
-                child: const Text(
-                  'View All',
-                  style: TextStyle(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (recentOrders.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 48),
-              child: Center(
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.inbox_outlined,
-                        size: 48,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No orders today',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2D3436),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Orders will appear here when customers place them',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentOrders.length,
-              itemBuilder: (context, index) =>
-                  _buildOrderItem(context, recentOrders[index]),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOrderItem(BuildContext context, Order order) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -258,41 +156,35 @@ class RecentOrdersWidget extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return const Color(0xFFF59E0B); // Amber
-      case 'confirmed':
-        return const Color(0xFF3B82F6); // Blue
-      case 'preparing':
-        return const Color(0xFF8B5CF6); // Purple
-      case 'ready':
-        return const Color(0xFF10B981); // Emerald
-      case 'out_for_delivery':
-        return const Color(0xFF6366F1); // Indigo
-      case 'delivered':
-        return const Color(0xFF059669); // Green
-      case 'cancelled':
-        return const Color(0xFFEF4444); // Red
-      case 'refunded':
-        return const Color(0xFF6B7280); // Gray
-      default:
-        return const Color(0xFF6B7280); // Gray
-    }
-  }
-
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
+    if (difference.inMinutes < 60) {
       return '${difference.inMinutes} min ago';
     } else if (difference.inHours < 24) {
       return '${difference.inHours} hours ago';
-    } else {
+    } else if (difference.inDays < 7) {
       return '${difference.inDays} days ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'confirmed':
+        return Colors.blue;
+      case 'preparing':
+        return Colors.purple;
+      case 'delivered':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 }

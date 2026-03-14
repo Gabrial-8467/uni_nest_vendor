@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
+import '../utils/app_theme.dart';
+import '../widgets/order_card.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -32,65 +34,153 @@ class _OrdersScreenState extends State<OrdersScreen>
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: AppTheme.surface,
             elevation: 0,
-            foregroundColor: const Color(0xFF2D3436),
-            title: const Text('Orders'),
-            bottom: TabBar(
-              controller: _tabController,
-              labelColor: const Color(0xFFFF6B6B),
-              unselectedLabelColor: Colors.grey[600],
-              indicatorColor: const Color(0xFFFF6B6B),
-              isScrollable: true,
-              tabs: const [
-                Tab(text: 'All'),
-                Tab(text: 'Pending'),
-                Tab(text: 'Confirmed'),
-                Tab(text: 'Preparing'),
-                Tab(text: 'Completed'),
-              ],
-            ),
+            foregroundColor: AppTheme.textPrimary,
+            toolbarHeight: 10,
           ),
           body: Column(
             children: [
-              // Search Bar
+              // Search and Filter Section
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search orders...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    // Search Bar
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search orders by ID, customer...',
+                          prefixIcon: const Icon(Icons.search_outlined),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                  icon: const Icon(Icons.clear),
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.grey[300]!,
+                              width: 1.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppTheme.primary,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setState(() {});
+                        },
+                      ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
+                    const SizedBox(width: 12),
+                    // Filter Button
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        onPressed: () {
+                          _showFilterDialog(context);
+                        },
+                        icon: const Icon(
+                          Icons.filter_list_outlined,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
+
+              // Tabs
+              Container(
+                color: AppTheme.surface,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: AppTheme.primary,
+                  unselectedLabelColor: Colors.grey[600],
+                  indicatorColor: AppTheme.primary,
+                  indicatorWeight: 3,
+                  isScrollable: true,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  tabs: const [
+                    Tab(text: 'All'),
+                    Tab(text: 'Pending'),
+                    Tab(text: 'Confirmed'),
+                    Tab(text: 'Preparing'),
+                    Tab(text: 'Completed'),
+                  ],
+                ),
+              ),
+
               // Orders List
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildOrdersList(vendorProvider.orders),
                     _buildOrdersList(
-                      vendorProvider.getOrdersByStatus('pending'),
+                      _getFilteredOrders(vendorProvider.orders),
+                      'All',
                     ),
                     _buildOrdersList(
-                      vendorProvider.getOrdersByStatus('confirmed'),
+                      _getFilteredOrders(
+                        vendorProvider.getOrdersByStatus('pending'),
+                      ),
+                      'Pending',
                     ),
                     _buildOrdersList(
-                      vendorProvider.getOrdersByStatus('preparing'),
+                      _getFilteredOrders(
+                        vendorProvider.getOrdersByStatus('confirmed'),
+                      ),
+                      'Confirmed',
                     ),
                     _buildOrdersList(
-                      vendorProvider.getOrdersByStatus('delivered'),
+                      _getFilteredOrders(
+                        vendorProvider.getOrdersByStatus('preparing'),
+                      ),
+                      'Preparing',
+                    ),
+                    _buildOrdersList(
+                      _getFilteredOrders(
+                        vendorProvider.getOrdersByStatus('delivered'),
+                      ),
+                      'Completed',
                     ),
                   ],
                 ),
@@ -102,21 +192,95 @@ class _OrdersScreenState extends State<OrdersScreen>
     );
   }
 
-  Widget _buildOrdersList(List orders) {
+  List _getFilteredOrders(List orders) {
+    if (_searchController.text.isEmpty) {
+      return orders;
+    }
+
+    final searchQuery = _searchController.text.toLowerCase();
+    return orders.where((order) {
+      return order.id.toLowerCase().contains(searchQuery) ||
+          order.customerName.toLowerCase().contains(searchQuery) ||
+          order.customerPhone.toLowerCase().contains(searchQuery);
+    }).toList();
+  }
+
+  void _showFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Filter Orders'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Date Range'),
+              leading: const Icon(Icons.date_range_outlined),
+              onTap: () {
+                Navigator.pop(context);
+                // Show date range picker
+              },
+            ),
+            ListTile(
+              title: const Text('Order Status'),
+              leading: const Icon(Icons.filter_list_outlined),
+              onTap: () {
+                Navigator.pop(context);
+                // Show status filter
+              },
+            ),
+            ListTile(
+              title: const Text('Amount Range'),
+              leading: const Icon(Icons.attach_money_outlined),
+              onTap: () {
+                Navigator.pop(context);
+                // Show amount filter
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersList(List orders, String category) {
     if (orders.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No orders found',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
+              child: Icon(
+                Icons.inbox_outlined,
+                size: 64,
+                color: AppTheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No $category orders',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Orders will appear here when customers place them',
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -135,160 +299,5 @@ class _OrdersScreenState extends State<OrdersScreen>
         },
       ),
     );
-  }
-}
-
-class OrderCard extends StatelessWidget {
-  final dynamic order;
-
-  const OrderCard({super.key, required this.order});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Order #${order.id?.substring(order.id.length - 8) ?? 'N/A'}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(order.status).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  order.status?.toUpperCase() ?? 'UNKNOWN',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: _getStatusColor(order.status),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
-              const SizedBox(width: 4),
-              Text(
-                _formatDateTime(order.createdAt),
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              const Spacer(),
-              Text(
-                '₹${order.finalAmount?.toStringAsFixed(2) ?? '0.00'}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${order.items?.length ?? 0} items',
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    // View order details
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFFF6B6B)),
-                    foregroundColor: const Color(0xFFFF6B6B),
-                  ),
-                  child: const Text('View Details'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Update status
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B6B),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Update Status'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getStatusColor(String? status) {
-    if (status == null) return Colors.grey;
-
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'confirmed':
-        return Colors.blue;
-      case 'preparing':
-        return Colors.purple;
-      case 'ready':
-        return Colors.green;
-      case 'out_for_delivery':
-        return Colors.indigo;
-      case 'delivered':
-        return Colors.teal;
-      case 'cancelled':
-        return Colors.red;
-      case 'refunded':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatDateTime(DateTime? dateTime) {
-    if (dateTime == null) return 'Unknown';
-
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} min ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} hours ago';
-    } else {
-      return '${difference.inDays} days ago';
-    }
   }
 }
