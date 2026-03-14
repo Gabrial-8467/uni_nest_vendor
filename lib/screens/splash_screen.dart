@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToAuth() {
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/auth');
+        Navigator.of(context).pushReplacementNamed('/dashboard');
       }
     });
   }

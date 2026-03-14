@@ -50,8 +50,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.secondary.withValues(alpha: 0.3),
-                      AppTheme.secondary.withValues(alpha: 0.1),
+                      AppTheme.primary.withValues(alpha: 0.3),
+                      AppTheme.primary.withValues(alpha: 0.1),
                       Colors.transparent,
                     ],
                   ),
@@ -68,8 +68,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.primary.withValues(alpha: 0.2),
-                      AppTheme.primary.withValues(alpha: 0.1),
+                      AppTheme.secondary.withValues(alpha: 0.2),
+                      AppTheme.secondary.withValues(alpha: 0.1),
                       Colors.transparent,
                     ],
                   ),
@@ -78,18 +78,16 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             // Main Content
             SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 40),
-                      _buildHeader(),
-                      const SizedBox(height: 40),
-                      _buildLoginForm(),
-                    ],
-                  ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 40),
+                    _buildHeader(),
+                    const SizedBox(height: 40),
+                    _buildLoginForm(),
+                  ],
                 ),
               ),
             ),
@@ -128,13 +126,11 @@ class _LoginScreenState extends State<LoginScreen> {
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: AppTheme.secondaryGradient,
-              ),
+              gradient: const LinearGradient(colors: AppTheme.primaryGradient),
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.secondary.withValues(alpha: 0.3),
+                  color: AppTheme.primary.withValues(alpha: 0.3),
                   blurRadius: 25,
                   offset: const Offset(0, 10),
                 ),
@@ -219,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Text(
                       'Forgot Password?',
                       style: TextStyle(
-                        color: AppTheme.secondary,
+                        color: AppTheme.primary,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -233,10 +229,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : () => _login(vendorProvider),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondary,
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: AppTheme.textWhite,
                       elevation: 0,
-                      shadowColor: AppTheme.secondary.withValues(alpha: 0.3),
+                      shadowColor: AppTheme.primary.withValues(alpha: 0.3),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -274,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         'Sign Up',
                         style: TextStyle(
-                          color: AppTheme.secondary,
+                          color: AppTheme.primary,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),

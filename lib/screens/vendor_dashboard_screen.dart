@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
+import '../utils/app_theme.dart';
 import '../widgets/vendor_drawer.dart';
 import '../widgets/analytics_card.dart';
 import '../widgets/recent_orders_widget.dart';
@@ -32,13 +33,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
 
     _animationController.forward();
   }
@@ -55,22 +52,19 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: AppTheme.background,
           appBar: _buildAppBar(context, vendorProvider),
           drawer: const VendorDrawer(),
-          body: RefreshIndicator(
-            onRefresh: () => vendorProvider.refreshData(),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildOverviewTab(vendorProvider),
-                  _buildOrdersTab(vendorProvider),
-                  _buildProductsTab(vendorProvider),
-                  _buildAnalyticsTab(vendorProvider),
-                ],
-              ),
+          body: FadeTransition(
+            opacity: _fadeAnimation,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOverviewTab(vendorProvider),
+                _buildOrdersTab(vendorProvider),
+                _buildProductsTab(vendorProvider),
+                _buildAnalyticsTab(vendorProvider),
+              ],
             ),
           ),
           floatingActionButton: _buildFloatingActionButton(vendorProvider),
@@ -79,11 +73,14 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, VendorProvider vendorProvider) {
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    VendorProvider vendorProvider,
+  ) {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.surface,
       elevation: 0,
-      foregroundColor: const Color(0xFF2D3436),
+      foregroundColor: AppTheme.textPrimary,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -98,36 +95,23 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           if (vendorProvider.currentVendor != null)
             Text(
               vendorProvider.currentVendor!.businessName,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
         ],
       ),
       actions: [
         IconButton(
-          icon: Badge(
-            label: Text(
-              vendorProvider.pendingOrdersCount.toString(),
-              style: const TextStyle(fontSize: 10),
-            ),
-            child: const Icon(Icons.notifications_outlined),
-          ),
+          icon: const Icon(Icons.notifications_outlined),
           onPressed: () {
             // Navigate to notifications
           },
         ),
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: () => vendorProvider.refreshData(),
-        ),
       ],
       bottom: TabBar(
         controller: _tabController,
-        labelColor: const Color(0xFFFF6B6B),
-        unselectedLabelColor: Colors.grey[600],
-        indicatorColor: const Color(0xFFFF6B6B),
+        labelColor: AppTheme.primary,
+        unselectedLabelColor: AppTheme.textSecondary,
+        indicatorColor: AppTheme.primary,
         tabs: const [
           Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined)),
           Tab(text: 'Orders', icon: Icon(Icons.receipt_long_outlined)),
@@ -139,51 +123,80 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   }
 
   Widget _buildOverviewTab(VendorProvider vendorProvider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Quick Stats
-          QuickStatsWidget(vendorProvider: vendorProvider),
-          const SizedBox(height: 20),
-          
-          // Revenue Chart
-          RevenueChartWidget(vendorProvider: vendorProvider),
-          const SizedBox(height: 20),
-          
-          // Recent Orders
-          RecentOrdersWidget(vendorProvider: vendorProvider),
-          const SizedBox(height: 20),
-          
-          // Analytics Cards
-          Row(
-            children: [
-              Expanded(
-                child: AnalyticsCard(
-                  title: 'Today\'s Revenue',
-                  value: '₹${vendorProvider.todayRevenue.toStringAsFixed(2)}',
-                  icon: Icons.trending_up,
-                  color: Colors.green,
-                  change: '+12.5%',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AnalyticsCard(
-                  title: 'Active Products',
-                  value: vendorProvider.products
-                      .where((p) => p.isAvailable)
-                      .length
-                      .toString(),
-                  icon: Icons.inventory,
-                  color: Colors.blue,
-                  change: '+2 new',
-                ),
-              ),
-            ],
-          ),
-        ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        await vendorProvider.refreshData();
+      },
+      color: AppTheme.primary,
+      backgroundColor: AppTheme.surface,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isSmallScreen = constraints.maxWidth < 600;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Quick Stats
+                QuickStatsWidget(vendorProvider: vendorProvider),
+                SizedBox(height: isSmallScreen ? 16 : 20),
+
+                // Revenue Chart
+                RevenueChartWidget(vendorProvider: vendorProvider),
+                SizedBox(height: isSmallScreen ? 16 : 20),
+
+                // Recent Orders
+                RecentOrdersWidget(vendorProvider: vendorProvider),
+                SizedBox(height: isSmallScreen ? 16 : 20),
+
+                // Analytics Cards - Responsive layout
+                isSmallScreen
+                    ? Column(
+                        children: [
+                          AnalyticsCard(
+                            title: 'Total Revenue',
+                            value:
+                                '\$${(vendorProvider.earnings['total'] ?? 0).toStringAsFixed(2)}',
+                            icon: Icons.attach_money,
+                            color: Colors.green,
+                          ),
+                          const SizedBox(height: 12),
+                          AnalyticsCard(
+                            title: 'Total Orders',
+                            value: '${vendorProvider.orders.length}',
+                            icon: Icons.shopping_bag,
+                            color: Colors.blue,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: AnalyticsCard(
+                              title: 'Total Revenue',
+                              value:
+                                  '\$${(vendorProvider.earnings['total'] ?? 0).toStringAsFixed(2)}',
+                              icon: Icons.attach_money,
+                              color: Colors.green,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: AnalyticsCard(
+                              title: 'Total Orders',
+                              value: '${vendorProvider.orders.length}',
+                              icon: Icons.shopping_bag,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -205,8 +218,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       onPressed: () {
         _showQuickActionMenu(vendorProvider);
       },
-      backgroundColor: const Color(0xFFFF6B6B),
-      foregroundColor: Colors.white,
+      backgroundColor: AppTheme.primary,
+      foregroundColor: AppTheme.textWhite,
       icon: const Icon(Icons.add),
       label: const Text('Quick Actions'),
     );
@@ -236,10 +249,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             const SizedBox(height: 20),
             const Text(
               'Quick Actions',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             GridView.count(

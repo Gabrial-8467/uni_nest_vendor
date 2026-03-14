@@ -94,13 +94,13 @@ class _SignupScreenState extends State<SignupScreen> {
             SafeArea(
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _buildHeader(),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 16),
                       _buildSignupForm(),
                     ],
                   ),
@@ -135,7 +135,7 @@ class _SignupScreenState extends State<SignupScreen> {
             fontWeight: FontWeight.w400,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         // Logo
         Center(
           child: Container(
@@ -167,15 +167,15 @@ class _SignupScreenState extends State<SignupScreen> {
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) {
         return Container(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -185,7 +185,7 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 // Personal Information Section
                 _buildSectionHeader('Personal Information', Icons.person),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 _buildFormField(
                   controller: _nameController,
                   label: 'Full Name',
@@ -235,11 +235,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   },
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
                 // Business Information Section
                 _buildSectionHeader('Business Information', Icons.business),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 _buildFormField(
                   controller: _businessNameController,
                   label: 'Business Name',
@@ -254,11 +254,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 16),
                 _buildBusinessTypeDropdown(),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
                 // Password Setup Section
                 _buildSectionHeader('Password Setup', Icons.lock),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 _buildPasswordField(
                   controller: _passwordController,
                   label: 'Password',
@@ -304,38 +304,26 @@ class _SignupScreenState extends State<SignupScreen> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // Terms and Conditions
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () {
+                    Checkbox(
+                      value: _agreeToTerms,
+                      onChanged: (bool? value) {
                         setState(() {
-                          _agreeToTerms = !_agreeToTerms;
+                          _agreeToTerms = value ?? false;
                         });
                       },
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _agreeToTerms
-                                ? AppTheme.primary
-                                : AppTheme.textLight.withValues(alpha: 0.5),
-                          ),
-                          color: _agreeToTerms
-                              ? AppTheme.primary
-                              : Colors.transparent,
-                        ),
-                        child: _agreeToTerms
-                            ? const Icon(
-                                Icons.check,
-                                color: AppTheme.textWhite,
-                                size: 16,
-                              )
-                            : null,
+                      activeColor: AppTheme.primary,
+                      checkColor: AppTheme.textWhite,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      side: BorderSide(
+                        color: AppTheme.textLight.withValues(alpha: 0.5),
+                        width: 2,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -370,7 +358,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
                 // Sign Up Button
                 SizedBox(
@@ -405,7 +393,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // Sign In Link
                 Row(
