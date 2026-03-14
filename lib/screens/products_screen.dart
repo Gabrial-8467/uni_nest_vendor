@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
+import '../utils/app_theme.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -24,20 +25,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: AppTheme.surface,
             elevation: 0,
-            foregroundColor: const Color(0xFF2D3436),
-            title: const Text('Products'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () {
-                  // Add new product
-                },
-              ),
-            ],
+            foregroundColor: AppTheme.textPrimary,
+            toolbarHeight: 10,
           ),
           body: Column(
             children: [
@@ -57,7 +50,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
+                          borderSide: BorderSide(color: AppTheme.primary),
                         ),
                       ),
                     ),
@@ -67,30 +60,33 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       height: 40,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
-                        children: [
-                          'All',
-                          'Snacks',
-                          'Beverages',
-                          'South Indian',
-                          'North Indian',
-                          'Chinese',
-                          'Desserts',
-                        ].map((category) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(category),
-                              selected: _selectedCategory == category,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _selectedCategory = selected ? category : 'All';
-                                });
-                              },
-                              backgroundColor: Colors.white,
-                              selectedColor: const Color(0xFFFF6B6B),
-                            ),
-                          );
-                        }).toList(),
+                        children:
+                            [
+                              'All',
+                              'Snacks',
+                              'Beverages',
+                              'South Indian',
+                              'North Indian',
+                              'Chinese',
+                              'Desserts',
+                            ].map((category) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  label: Text(category),
+                                  selected: _selectedCategory == category,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      _selectedCategory = selected
+                                          ? category
+                                          : 'All';
+                                    });
+                                  },
+                                  backgroundColor: Colors.white,
+                                  selectedColor: AppTheme.primary,
+                                ),
+                              );
+                            }).toList(),
                       ),
                     ),
                   ],
@@ -99,55 +95,59 @@ class _ProductsScreenState extends State<ProductsScreen> {
               // Products List
               Expanded(
                 child: vendorProvider.isLoadingProducts
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppTheme.primary,
+                        ),
+                      )
                     : vendorProvider.products.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 64,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No products found',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    // Add first product
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFF6B6B),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Add Product'),
-                                ),
-                              ],
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: vendorProvider.products.length,
-                            itemBuilder: (context, index) {
-                              return ProductCard(
-                                product: vendorProvider.products[index],
-                                onEdit: () {
-                                  // Edit product
-                                },
-                                onDelete: () {
-                                  // Delete product
-                                },
-                              );
+                            const SizedBox(height: 16),
+                            Text(
+                              'No products found',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                // Add first product
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Add Product'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: vendorProvider.products.length,
+                        itemBuilder: (context, index) {
+                          return ProductCard(
+                            product: vendorProvider.products[index],
+                            onEdit: () {
+                              // Edit product
                             },
-                          ),
+                            onDelete: () {
+                              // Delete product
+                            },
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -177,11 +177,11 @@ class ProductCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Color(0x0D000000), // Black with 5% opacity
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -212,10 +212,7 @@ class ProductCard extends StatelessWidget {
                           },
                         ),
                       )
-                    : Icon(
-                        Icons.image_not_supported,
-                        color: Colors.grey[400],
-                      ),
+                    : Icon(Icons.image_not_supported, color: Colors.grey[400]),
               ),
               const SizedBox(width: 12),
               // Product Info
@@ -228,6 +225,7 @@ class ProductCard extends StatelessWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: AppTheme.textPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -235,10 +233,7 @@ class ProductCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       product.category ?? 'Uncategorized',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -248,10 +243,11 @@ class ProductCard extends StatelessWidget {
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: Color(0xFF2D3436),
+                            color: AppTheme.textPrimary,
                           ),
                         ),
-                        if (product.discountPercentage != null && product.discountPercentage! > 0)
+                        if (product.discountPercentage != null &&
+                            product.discountPercentage! > 0)
                           Padding(
                             padding: const EdgeInsets.only(left: 8),
                             child: Text(
@@ -270,10 +266,7 @@ class ProductCard extends StatelessWidget {
               ),
               // Status Badge
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: product.isAvailable == true
                       ? Colors.green.withValues(alpha: 0.1)
@@ -285,7 +278,9 @@ class ProductCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: product.isAvailable == true ? Colors.green : Colors.red,
+                    color: product.isAvailable == true
+                        ? Colors.green
+                        : Colors.red,
                   ),
                 ),
               ),
@@ -295,29 +290,22 @@ class ProductCard extends StatelessWidget {
           // Stock and Actions
           Row(
             children: [
-              Icon(
-                Icons.inventory,
-                size: 16,
-                color: Colors.grey[600],
-              ),
+              Icon(Icons.inventory, size: 16, color: Colors.grey[600]),
               const SizedBox(width: 4),
               Text(
                 'Stock: ${product.stockQuantity ?? 0}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               const Spacer(),
               IconButton(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
-                color: Colors.blue,
+                color: AppTheme.primary,
               ),
               IconButton(
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline),
-                color: Colors.red,
+                color: AppTheme.primary,
               ),
             ],
           ),

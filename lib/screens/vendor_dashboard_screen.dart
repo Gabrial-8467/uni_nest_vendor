@@ -67,13 +67,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             _buildOrdersTab(context),
             _buildProductsTab(context),
             _buildAnalyticsTab(context),
+            _buildProfileTab(context),
           ],
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: _currentIndex == 0
-          ? _buildFloatingActionButton(context)
-          : null,
     );
   }
 
@@ -192,6 +190,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             activeIcon: Icon(Icons.analytics),
             label: 'Analytics',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );
@@ -207,6 +210,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         return 'Products';
       case 3:
         return 'Analytics';
+      case 4:
+        return 'Profile';
       default:
         return 'Dashboard';
     }
@@ -305,147 +310,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     return const AnalyticsScreen();
   }
 
-  Widget _buildFloatingActionButton(BuildContext context) {
-    return Consumer<VendorProvider>(
-      builder: (context, vendorProvider, child) =>
-          FloatingActionButton.extended(
-            onPressed: () {
-              _showQuickActionMenu(vendorProvider);
-            },
-            backgroundColor: AppTheme.primary,
-            foregroundColor: AppTheme.textWhite,
-            icon: const Icon(Icons.add),
-            label: const Text('Quick Actions'),
-          ),
-    );
-  }
-
-  void _showQuickActionMenu(VendorProvider vendorProvider) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Quick Actions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.5,
-              children: [
-                _buildQuickActionItem(
-                  'Add Product',
-                  Icons.add_shopping_cart,
-                  AppTheme.primary,
-                  () => Navigator.pushNamed(context, '/add-product'),
-                ),
-                _buildQuickActionItem(
-                  'View Orders',
-                  Icons.receipt_long,
-                  AppTheme.primary,
-                  () {
-                    setState(() {
-                      _currentIndex = 1;
-                    });
-                    _pageController.animateToPage(
-                      1,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  },
-                ),
-                _buildQuickActionItem(
-                  'Analytics',
-                  Icons.analytics,
-                  AppTheme.primary,
-                  () {
-                    setState(() {
-                      _currentIndex = 3;
-                    });
-                    _pageController.animateToPage(
-                      3,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  },
-                ),
-                _buildQuickActionItem(
-                  'Profile',
-                  Icons.person,
-                  AppTheme.primary,
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ProfileScreen(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActionItem(
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Widget _buildProfileTab(BuildContext context) {
+    return const ProfileScreen();
   }
 }

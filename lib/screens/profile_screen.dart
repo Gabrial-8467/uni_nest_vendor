@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
+import '../utils/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,6 +18,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _businessNameController = TextEditingController();
   final _businessTypeController = TextEditingController();
   final _locationController = TextEditingController();
+  bool _isEditing = false;
 
   @override
   void dispose() {
@@ -35,112 +37,177 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context, vendorProvider, child) {
         final vendor = vendorProvider.currentVendor;
 
+        // Initialize controllers with vendor data
+        if (vendor != null) {
+          _nameController.text = vendor.name;
+          _emailController.text = vendor.email;
+          _phoneController.text = vendor.phone;
+          _businessNameController.text = vendor.businessName;
+          _businessTypeController.text = vendor.businessType;
+          _locationController.text = vendor.location;
+        }
+
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: AppTheme.surface,
             elevation: 0,
-            foregroundColor: const Color(0xFF2D3436),
-            title: const Text('Profile'),
+            foregroundColor: AppTheme.textPrimary,
+            toolbarHeight: 10,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () {
+                  // Scroll to the edit form
+                  Scrollable.ensureVisible(
+                    _formKey.currentContext!,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                style: IconButton.styleFrom(foregroundColor: AppTheme.primary),
+              ),
+            ],
           ),
-          body: vendor == null
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  // Profile Header
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0D000000), // Black with 5% opacity
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
                     child: Column(
                       children: [
-                        // Profile Header
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                        Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundColor: AppTheme.primary,
+                              child: Text(
+                                vendor != null && vendor.businessName.isNotEmpty
+                                    ? vendor.businessName[0].toUpperCase()
+                                    : 'V',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Stack(
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  CircleAvatar(
-                                    radius: 50,
-                                    backgroundColor: const Color(0xFFFF6B6B),
-                                    child: Text(
-                                      vendor.businessName.isNotEmpty
-                                          ? vendor.businessName[0].toUpperCase()
-                                          : 'V',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  Text(
+                                    vendor?.businessName ?? 'Your Business',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2D3436),
                                     ),
                                   ),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFF6B6B),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    vendor?.email ?? 'vendor@example.com',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${vendor?.businessType ?? 'Business Type'} • ${vendor?.location ?? 'Location'}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                vendor.businessName,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D3436),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.primary.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                vendor.email,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
+                              child: IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditing = !_isEditing;
+                                  });
+                                },
+                                icon: Icon(
+                                  _isEditing
+                                      ? Icons.check
+                                      : Icons.edit_outlined,
+                                  color: AppTheme.primary,
+                                  size: 20,
                                 ),
+                                tooltip: _isEditing
+                                    ? 'Save Changes'
+                                    : 'Edit Profile',
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${vendor.businessType} • ${vendor.location}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 20),
-                        // Profile Form
-                        Container(
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Profile Form - Only show when editing
+                  _isEditing
+                      ? Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
+                            boxShadow: const [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
+                                color: Color(
+                                  0x0D000000,
+                                ), // Black with 5% opacity
                                 blurRadius: 10,
-                                offset: const Offset(0, 4),
+                                offset: Offset(0, 4),
                               ),
                             ],
                           ),
@@ -148,7 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Business Information',
+                                'Edit Business Information',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -157,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 20),
                               TextFormField(
-                                controller: _nameController..text = vendor.name,
+                                controller: _nameController,
                                 decoration: _buildInputDecoration('Full Name'),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -168,8 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
-                                controller: _emailController
-                                  ..text = vendor.email,
+                                controller: _emailController,
                                 decoration: _buildInputDecoration(
                                   'Email Address',
                                 ),
@@ -186,8 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
-                                controller: _phoneController
-                                  ..text = vendor.phone,
+                                controller: _phoneController,
                                 decoration: _buildInputDecoration(
                                   'Phone Number',
                                 ),
@@ -201,8 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
-                                controller: _businessNameController
-                                  ..text = vendor.businessName,
+                                controller: _businessNameController,
                                 decoration: _buildInputDecoration(
                                   'Business Name',
                                 ),
@@ -215,8 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
-                                controller: _businessTypeController
-                                  ..text = vendor.businessType,
+                                controller: _businessTypeController,
                                 decoration: _buildInputDecoration(
                                   'Business Type',
                                 ),
@@ -229,8 +292,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
-                                controller: _locationController
-                                  ..text = vendor.location,
+                                controller: _locationController,
                                 decoration: _buildInputDecoration('Location'),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -240,115 +302,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 },
                               ),
                               const SizedBox(height: 24),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    if (_formKey.currentState!.validate()) {
-                                      _updateProfile(vendorProvider);
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFF6B6B),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        if (_formKey.currentState!.validate()) {
+                                          _updateProfile(vendorProvider);
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: vendorProvider.isLoading
+                                          ? const CircularProgressIndicator(
+                                              color: Colors.white,
+                                            )
+                                          : const Text('Update Profile'),
                                     ),
                                   ),
-                                  child: vendorProvider.isLoading
-                                      ? const CircularProgressIndicator(
-                                          color: Colors.white,
-                                        )
-                                      : const Text('Update Profile'),
-                                ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _isEditing = false;
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.grey[300],
+                                        foregroundColor: Colors.black87,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text('Cancel'),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  const SizedBox(height: 20),
+                  // Account Actions
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0D000000), // Black with 5% opacity
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Account Actions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D3436),
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        // Account Actions
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Account Actions',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D3436),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildActionItem(
-                                'Change Password',
-                                Icons.lock_outline,
-                                Colors.blue,
-                                () {
-                                  // Navigate to change password
-                                },
-                              ),
-                              const Divider(),
-                              _buildActionItem(
-                                'Notification Settings',
-                                Icons.notifications_outlined,
-                                Colors.orange,
-                                () {
-                                  // Navigate to notification settings
-                                },
-                              ),
-                              const Divider(),
-                              _buildActionItem(
-                                'Privacy Settings',
-                                Icons.privacy_tip_outlined,
-                                Colors.green,
-                                () {
-                                  // Navigate to privacy settings
-                                },
-                              ),
-                              const Divider(),
-                              _buildActionItem(
-                                'Help & Support',
-                                Icons.help_outline,
-                                Colors.purple,
-                                () {
-                                  // Navigate to help & support
-                                },
-                              ),
-                              const Divider(),
-                              _buildActionItem(
-                                'Logout',
-                                Icons.logout,
-                                Colors.red,
-                                () async {
-                                  await vendorProvider.logout();
-                                  if (mounted && context.mounted) {
-                                    _navigateToLogin(context);
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
+                        const SizedBox(height: 16),
+                        _buildActionItem(
+                          'Change Password',
+                          Icons.lock_outline,
+                          Colors.blue,
+                          () {
+                            // Navigate to change password
+                          },
+                        ),
+                        const Divider(),
+                        _buildActionItem(
+                          'Notification Settings',
+                          Icons.notifications_outlined,
+                          Colors.orange,
+                          () {
+                            // Navigate to notification settings
+                          },
+                        ),
+                        const Divider(),
+                        _buildActionItem(
+                          'Privacy Settings',
+                          Icons.privacy_tip_outlined,
+                          Colors.green,
+                          () {
+                            // Navigate to privacy settings
+                          },
+                        ),
+                        const Divider(),
+                        _buildActionItem(
+                          'Help & Support',
+                          Icons.help_outline,
+                          Colors.purple,
+                          () {
+                            // Navigate to help & support
+                          },
+                        ),
+                        const Divider(),
+                        _buildActionItem(
+                          'Logout',
+                          Icons.logout,
+                          Colors.red,
+                          () async {
+                            await vendorProvider.logout();
+                            if (mounted && context.mounted) {
+                              _navigateToLogin(context);
+                            }
+                          },
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -363,7 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
+        borderSide: BorderSide(color: AppTheme.primary),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -423,6 +514,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: Colors.green,
         ),
       );
+      setState(() {
+        _isEditing = false;
+      });
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

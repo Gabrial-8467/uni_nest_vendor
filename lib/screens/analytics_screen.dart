@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../state/vendor_provider.dart';
+import '../utils/app_theme.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -32,17 +33,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: AppTheme.surface,
             elevation: 0,
-            foregroundColor: const Color(0xFF2D3436),
-            title: const Text('Analytics'),
+            foregroundColor: AppTheme.textPrimary,
+            toolbarHeight: 10,
             bottom: TabBar(
               controller: _tabController,
-              labelColor: const Color(0xFFFF6B6B),
+              labelColor: AppTheme.primary,
               unselectedLabelColor: Colors.grey[600],
-              indicatorColor: const Color(0xFFFF6B6B),
+              indicatorColor: AppTheme.primary,
               tabs: const [
                 Tab(text: 'Revenue'),
                 Tab(text: 'Orders'),
@@ -83,7 +84,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                                   });
                                 },
                                 backgroundColor: Colors.white,
-                                selectedColor: const Color(0xFFFF6B6B),
+                                selectedColor: AppTheme.primary,
                               ),
                             );
                           }).toList(),
@@ -180,9 +181,172 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           // Orders by Status
-          _buildOrdersByStatus(vendorProvider),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0D000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Orders by Status',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D3436),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${vendorProvider.orders.length} Total Orders',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                ...vendorProvider.orders.map((order) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x05000000),
+                          blurRadius: 5,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(order.status),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Order #${order.id.substring(order.id.length - 8)}',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2D3436),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(
+                                        order.status,
+                                      ).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      order.status.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: _getStatusColor(order.status),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Customer #${order.customerId.substring(order.customerId.length - 8)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${order.items.length} items • ${_formatDate(order.createdAt)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '₹${order.finalAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2D3436),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '₹${(order.finalAmount - order.discountAmount).toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                decoration: order.discountAmount > 0
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -222,7 +386,208 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           ),
           const SizedBox(height: 16),
           // Top Products
-          _buildTopProducts(vendorProvider),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0D000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Top Products',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D3436),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${vendorProvider.products.length} Products',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                ...vendorProvider.products.take(5).map((product) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x05000000),
+                          blurRadius: 5,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            color: Colors.grey[400],
+                            size: 30,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.name.isNotEmpty
+                                    ? product.name
+                                    : 'Unknown Product',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2D3436),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '₹${product.price.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Stock: ${product.stockQuantity}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: product.isAvailable
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.red.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                product.isAvailable
+                                    ? 'Available'
+                                    : 'Out of Stock',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: product.isAvailable
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${product.stockQuantity} units',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2D3436),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                if (vendorProvider.products.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 48,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No Products Available',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D3436),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Start adding products to see analytics here',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -344,8 +709,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       FlSpot(7, 3500),
                     ],
                     isCurved: true,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primary,
+                        AppTheme.primary.withValues(alpha: 0.8),
+                      ],
                     ),
                     barWidth: 3,
                     isStrokeCapRound: true,
@@ -354,8 +722,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFFFF6B6B).withValues(alpha: 0.3),
-                          const Color(0xFFFF6B6B).withValues(alpha: 0.0),
+                          AppTheme.primary.withValues(alpha: 0.3),
+                          AppTheme.primary.withValues(alpha: 0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -372,16 +740,111 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   Widget _buildRevenueByCategory(VendorProvider vendorProvider) {
+    // Generate different colors for each category
+    final colors = [
+      AppTheme.primary,
+      const Color(0xFF4ECDC4),
+      const Color(0xFF45B7D1),
+      const Color(0xFFF9C74F),
+      const Color(0xFFE74C3C),
+      const Color(0xFF9B59B6),
+      const Color(0xFF1ABC9C),
+      const Color(0xFFF39C12),
+      const Color(0xFF27AE60),
+      const Color(0xFFE67E22),
+    ];
+
+    // Calculate revenue for each category
+    final categoryData = <String, double>{};
+    for (final product in vendorProvider.products) {
+      final category = product.category;
+      if (categoryData.containsKey(category)) {
+        categoryData[category] = categoryData[category]! + product.price;
+      } else {
+        categoryData[category] = product.price;
+      }
+    }
+
+    final totalRevenue = categoryData.values.fold(
+      0.0,
+      (sum, value) => sum + value,
+    );
+
+    // Show empty state if no categories
+    if (categoryData.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0D000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Revenue by Category',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3436),
+              ),
+            ),
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.insert_chart_outlined,
+                      size: 48,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No categories available',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add products with categories to see the chart',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Color(0x0D000000), // Black with 5% opacity
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -399,243 +862,149 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           const SizedBox(height: 20),
           SizedBox(
             height: 200,
-            child: PieChart(
-              PieChartData(
-                sections: [
-                  PieChartSectionData(
-                    color: const Color(0xFFFF6B6B),
-                    value: 35,
-                    title: 'Snacks',
-                    radius: 50,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  PieChartSectionData(
-                    color: const Color(0xFF4ECDC4),
-                    value: 25,
-                    title: 'Beverages',
-                    radius: 50,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  PieChartSectionData(
-                    color: const Color(0xFF45B7D1),
-                    value: 20,
-                    title: 'South Indian',
-                    radius: 50,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  PieChartSectionData(
-                    color: const Color(0xFFF9C74F),
-                    value: 20,
-                    title: 'Others',
-                    radius: 50,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+            child: Row(
+              children: [
+                // Pie Chart
+                Expanded(
+                  flex: 2,
+                  child: PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 60,
+                      sections: categoryData.entries
+                          .toList()
+                          .asMap()
+                          .entries
+                          .map((entry) {
+                            final index = entry.key;
+                            final mapEntry = entry.value;
+                            final value = mapEntry.value;
+                            final percentage = totalRevenue > 0
+                                ? (value / totalRevenue * 100)
+                                : 0.0;
+                            final color = colors[index % colors.length];
 
-  Widget _buildOrdersByStatus(VendorProvider vendorProvider) {
-    final statusCounts = <String, int>{};
-    for (final order in vendorProvider.orders) {
-      statusCounts[order.status] = (statusCounts[order.status] ?? 0) + 1;
-    }
+                            return PieChartSectionData(
+                              color: color,
+                              value: value,
+                              title: '${percentage.toStringAsFixed(1)}%',
+                              radius: 50,
+                              titlePositionPercentageOffset: 0.6,
+                              titleStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            );
+                          })
+                          .toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Category Names and Values
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: categoryData.entries.toList().asMap().entries.map((
+                      entry,
+                    ) {
+                      final index = entry.key;
+                      final mapEntry = entry.value;
+                      final color = colors[index % colors.length];
+                      final percentage = totalRevenue > 0
+                          ? (mapEntry.value / totalRevenue * 100)
+                          : 0.0;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Orders by Status',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3436),
-            ),
-          ),
-          const SizedBox(height: 20),
-          ...statusCounts.entries.map((entry) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(entry.key),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    mapEntry.key,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2D3436),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '₹${mapEntry.value.toStringAsFixed(0)} (${percentage.toStringAsFixed(1)}%)',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      entry.key.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    entry.value.toString(),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2D3436),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopProducts(VendorProvider vendorProvider) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Top Products',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3436),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
-          ...vendorProvider.products.take(5).map((product) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.image, color: Colors.grey[400]),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.name.isNotEmpty ? product.name : 'Unknown',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          '₹${product.price.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${product.stockQuantity}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D3436),
-                        ),
-                      ),
-                      Text(
-                        'in stock',
-                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }),
         ],
       ),
     );
   }
+}
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'confirmed':
-        return Colors.blue;
-      case 'preparing':
-        return Colors.purple;
-      case 'ready':
-        return Colors.green;
-      case 'out_for_delivery':
-        return Colors.indigo;
-      case 'delivered':
-        return Colors.teal;
-      case 'cancelled':
-        return Colors.red;
-      case 'refunded':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
+String _formatDate(DateTime date) {
+  final now = DateTime.now();
+  final difference = now.difference(date);
+
+  if (difference.inDays == 0) {
+    return 'Today';
+  } else if (difference.inDays == 1) {
+    return 'Yesterday';
+  } else if (difference.inDays < 7) {
+    return '${difference.inDays} days ago';
+  } else {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+Color _getStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return Colors.orange;
+    case 'confirmed':
+      return Colors.blue;
+    case 'preparing':
+      return Colors.purple;
+    case 'ready':
+      return Colors.green;
+    case 'out_for_delivery':
+      return Colors.indigo;
+    case 'delivered':
+      return Colors.teal;
+    case 'cancelled':
+      return Colors.red;
+    case 'refunded':
+      return Colors.grey;
+    default:
+      return Colors.grey;
   }
 }
