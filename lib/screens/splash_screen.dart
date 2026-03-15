@@ -91,10 +91,14 @@ class _SplashScreenState extends State<SplashScreen>
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.store,
-                            size: 70,
-                            color: AppTheme.primary,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(35),
+                            child: Image.asset(
+                              'assets/images/uninest.jpeg',
+                              width: 140,
+                              height: 140,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 40),
