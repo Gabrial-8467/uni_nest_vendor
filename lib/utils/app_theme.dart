@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Primary Color Palette - Modern Teal & Coral
-  static const Color primary = Color(0xFF00BFA5);
-  static const Color primaryLight = Color(0xFF4DD0C1);
-  static const Color primaryDark = Color(0xFF00897B);
+  // Primary Color Palette - Red from graduation cap
+  static const Color primary = Color(0xFFE53935);
+  static const Color primaryLight = Color(0xFFEF5350);
+  static const Color primaryDark = Color(0xFFC62828);
 
-  // Secondary Color Palette - Warm Coral
-  static const Color secondary = Color(0xFFFF6B9D);
-  static const Color secondaryLight = Color(0xFFFF8FAB);
-  static const Color secondaryDark = Color(0xFFE91E63);
+  // Secondary Color Palette - Blue from bowl
+  static const Color secondary = Color(0xFF1976D2);
+  static const Color secondaryLight = Color(0xFF42A5F5);
+  static const Color secondaryDark = Color(0xFF1565C0);
+
+  // Accent Color - Yellow from tassel and book
+  static const Color accent = Color(0xFFFFC107);
+  static const Color accentLight = Color(0xFFFFCA28);
+  static const Color accentDark = Color(0xFFFFA000);
 
   // Background Colors
-  static const Color background = Color(0xFFF8FAFB);
+  static const Color background = Color(0xFFF5F5F5);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color cardBackground = Color(0xFFFFFFFF);
 
@@ -28,25 +33,30 @@ class AppTheme {
   static const Color textWhite = Color(0xFFFFFFFF);
 
   // Status Colors
-  static const Color success = Color(0xFF00B894);
-  static const Color warning = Color(0xFFFDCB6E);
-  static const Color error = Color(0xFFE17055);
-  static const Color info = Color(0xFF74B9FF);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFFC107);
+  static const Color error = Color(0xFFE53935);
+  static const Color info = Color(0xFF1976D2);
 
   // Gradient Colors
   static const List<Color> primaryGradient = [
-    Color(0xFF00BFA5),
-    Color(0xFF4DD0C1),
+    Color(0xFFE53935),
+    Color(0xFFEF5350),
   ];
 
   static const List<Color> secondaryGradient = [
-    Color(0xFFFF6B9D),
-    Color(0xFFFF8FAB),
+    Color(0xFF1976D2),
+    Color(0xFF42A5F5),
+  ];
+
+  static const List<Color> accentGradient = [
+    Color(0xFFFFC107),
+    Color(0xFFFFCA28),
   ];
 
   static const List<Color> backgroundGradient = [
-    Color(0xFFF8FAFB),
-    Color(0xFFE8F5F3),
+    Color(0xFFE3F2FD), // Light blue
+    Color(0xFFF5F5F5), // Light grey
   ];
 
   static const List<Color> darkBackgroundGradient = [
@@ -59,7 +69,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      primarySwatch: Colors.teal,
+      primarySwatch: Colors.red,
       primaryColor: primary,
       colorScheme: const ColorScheme.light(
         primary: primary,
@@ -205,7 +215,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      primarySwatch: Colors.teal,
+      primarySwatch: Colors.red,
       primaryColor: primary,
       colorScheme: const ColorScheme.dark(
         primary: primary,
