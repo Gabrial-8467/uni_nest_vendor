@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_theme.dart';
+import 'live_chat_screen.dart';
 
 class HelpAndSupportScreen extends StatefulWidget {
   const HelpAndSupportScreen({super.key});
@@ -80,42 +82,16 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                   () => _launchPhone('+18002346378'),
                 ),
                 _buildContactItem(
-                  'General Support',
-                  'Send us an email for general inquiries',
+                  'Email Support',
+                  'Send us an email for support inquiries',
                   Icons.email,
                   Colors.blue,
                   'support@uninest.com',
                   () => _launchEmail(
                     'support@uninest.com',
-                    subject: 'General Support Request - UNI NEST Vendor',
+                    subject: 'Support Request - UNI NEST Vendor',
                     body:
                         'Hello UNI NEST Support,\n\nI need help with:\n\n[Please describe your issue here]\n\nThank you,\n[Your Name]\nVendor ID: [Your Vendor ID]',
-                  ),
-                ),
-                _buildContactItem(
-                  'Technical Support',
-                  'Get help with technical issues and bugs',
-                  Icons.bug_report,
-                  Colors.orange,
-                  'tech@uninest.com',
-                  () => _launchEmail(
-                    'tech@uninest.com',
-                    subject: 'Technical Support Request - UNI NEST Vendor',
-                    body:
-                        'Hello UNI NEST Technical Support,\n\nI am experiencing a technical issue:\n\nIssue Type: [Bug/Error/Feature Request]\nDescription: [Please describe the technical issue]\nSteps to reproduce: [If applicable]\nExpected behavior: [What should happen]\nActual behavior: [What actually happened]\n\nDevice/Platform: [Your device info]\nApp Version: 1.0.0\n\nThank you,\n[Your Name]',
-                  ),
-                ),
-                _buildContactItem(
-                  'Billing Support',
-                  'Questions about payments and billing',
-                  Icons.payment,
-                  Colors.purple,
-                  'billing@uninest.com',
-                  () => _launchEmail(
-                    'billing@uninest.com',
-                    subject: 'Billing Inquiry - UNI NEST Vendor',
-                    body:
-                        'Hello UNI NEST Billing Support,\n\nI have a question about billing:\n\nInquiry Type: [Payment Issue/Invoice Question/Pricing/Refund]\nDescription: [Please describe your billing question]\n\nOrder/Invoice ID: [If applicable]\nAmount: [If applicable]\nDate: [If applicable]\n\nThank you,\n[Your Name]\nVendor ID: [Your Vendor ID]',
                   ),
                 ),
                 _buildContactItem(
@@ -476,25 +452,119 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
     if (subject != null) queryParams['subject'] = subject;
     if (body != null) queryParams['body'] = body;
 
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: email,
-      query: _encodeQueryParameters(queryParams),
-    );
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
-    } else {
-      // Show a message that the email couldn't be launched
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not open email app. Please check your email settings.',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+    final String queryString = _encodeQueryParameters(queryParams) ?? '';
+
+    try {
+      // Try standard mailto first (this usually opens user's default email app, which is often Gmail)
+      final emailUri = Uri(
+        scheme: 'mailto',
+        path: email,
+        query: queryString.isNotEmpty ? queryString : null,
+      );
+
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+        return;
       }
+
+      // Try Gmail app using package-specific intent
+      final gmailIntent =
+          'intent://sendto/$email#Intent;scheme=mailto;package=com.google.android.gm;S.android.intent.action.SEND;end';
+
+      if (await canLaunchUrl(Uri.parse(gmailIntent))) {
+        await launchUrl(Uri.parse(gmailIntent));
+        return;
+      }
+
+      // Fallback: show manual email dialog
+      _showEmailFallback(email, subject, body);
+    } catch (e) {
+      _showEmailFallback(email, subject, body);
+    }
+  }
+
+  void _showEmailFallback(String email, String? subject, String? body) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Email App Not Available'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Could not open your email app. You can send us an email manually using the information below:',
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Email Address:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  SelectableText(email),
+                  if (subject != null) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Subject:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SelectableText(subject),
+                  ],
+                  if (body != null) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Message Template:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SelectableText(body),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _copyToClipboard(email, subject, body);
+            },
+            child: const Text('Copy Details'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyToClipboard(String email, String? subject, String? body) async {
+    final emailContent =
+        'To: $email\n'
+        'Subject: ${subject ?? "Support Request"}\n\n'
+        '${body ?? "Please describe your issue here..."}';
+
+    await Clipboard.setData(ClipboardData(text: emailContent));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email details copied to clipboard!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -527,7 +597,9 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
   }
 
   Future<void> _launchChat() async {
-    // Open the chat support page
-    await _launchUrl('https://uninest.com/support/chat');
+    // Navigate to the live chat screen
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const LiveChatScreen()));
   }
 }
