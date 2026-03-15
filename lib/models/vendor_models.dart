@@ -14,6 +14,7 @@ class Vendor {
   final DateTime createdAt;
   final String? profileImage;
   final Map<String, dynamic> businessDetails;
+  final NotificationSettings notificationSettings;
 
   Vendor({
     required this.id,
@@ -28,6 +29,7 @@ class Vendor {
     required this.createdAt,
     this.profileImage,
     required this.businessDetails,
+    required this.notificationSettings,
   });
 
   factory Vendor.fromJson(Map<String, dynamic> json) {
@@ -41,9 +43,14 @@ class Vendor {
       location: json['location'] ?? '',
       rating: (json['rating'] ?? 0.0).toDouble(),
       isActive: json['isActive'] ?? false,
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(
+        json['createdAt'] ?? DateTime.now().toIso8601String(),
+      ),
       profileImage: json['profileImage'],
       businessDetails: json['businessDetails'] ?? {},
+      notificationSettings: NotificationSettings.fromJson(
+        json['notificationSettings'] ?? {},
+      ),
     );
   }
 
@@ -61,6 +68,7 @@ class Vendor {
       'createdAt': createdAt.toIso8601String(),
       'profileImage': profileImage,
       'businessDetails': businessDetails,
+      'notificationSettings': notificationSettings.toJson(),
     };
   }
 
@@ -77,6 +85,7 @@ class Vendor {
     DateTime? createdAt,
     String? profileImage,
     Map<String, dynamic>? businessDetails,
+    NotificationSettings? notificationSettings,
   }) {
     return Vendor(
       id: id ?? this.id,
@@ -91,6 +100,7 @@ class Vendor {
       createdAt: createdAt ?? this.createdAt,
       profileImage: profileImage ?? this.profileImage,
       businessDetails: businessDetails ?? this.businessDetails,
+      notificationSettings: notificationSettings ?? this.notificationSettings,
     );
   }
 }
@@ -143,8 +153,12 @@ class Product {
       stockQuantity: json['stockQuantity'] ?? 0,
       tags: List<String>.from(json['tags'] ?? []),
       nutritionalInfo: json['nutritionalInfo'] ?? {},
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      createdAt: DateTime.parse(
+        json['createdAt'] ?? DateTime.now().toIso8601String(),
+      ),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : null,
       discountPercentage: json['discountPercentage']?.toDouble(),
       isFeatured: json['isFeatured'] ?? false,
     );
@@ -258,9 +272,11 @@ class Order {
       id: json['id'] ?? '',
       vendorId: json['vendorId'] ?? '',
       customerId: json['customerId'] ?? '',
-      items: (json['items'] as List<dynamic>?)
-          ?.map((item) => OrderItem.fromJson(item))
-          .toList() ?? [],
+      items:
+          (json['items'] as List<dynamic>?)
+              ?.map((item) => OrderItem.fromJson(item))
+              .toList() ??
+          [],
       totalAmount: (json['totalAmount'] ?? 0.0).toDouble(),
       discountAmount: (json['discountAmount'] ?? 0.0).toDouble(),
       finalAmount: (json['finalAmount'] ?? 0.0).toDouble(),
@@ -268,12 +284,14 @@ class Order {
       paymentMethod: json['paymentMethod'] ?? '',
       paymentStatus: json['paymentStatus'] ?? 'pending',
       deliveryAddress: json['deliveryAddress'] ?? {},
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
-      estimatedDeliveryTime: json['estimatedDeliveryTime'] != null 
-          ? DateTime.parse(json['estimatedDeliveryTime']) 
+      createdAt: DateTime.parse(
+        json['createdAt'] ?? DateTime.now().toIso8601String(),
+      ),
+      estimatedDeliveryTime: json['estimatedDeliveryTime'] != null
+          ? DateTime.parse(json['estimatedDeliveryTime'])
           : null,
-      deliveredAt: json['deliveredAt'] != null 
-          ? DateTime.parse(json['deliveredAt']) 
+      deliveredAt: json['deliveredAt'] != null
+          ? DateTime.parse(json['deliveredAt'])
           : null,
       customerNotes: json['customerNotes'],
       orderImages: List<String>.from(json['orderImages'] ?? []),
@@ -382,16 +400,22 @@ class VendorAnalytics {
   factory VendorAnalytics.fromJson(Map<String, dynamic> json) {
     return VendorAnalytics(
       vendorId: json['vendorId'] ?? '',
-      periodStart: DateTime.parse(json['periodStart'] ?? DateTime.now().toIso8601String()),
-      periodEnd: DateTime.parse(json['periodEnd'] ?? DateTime.now().toIso8601String()),
+      periodStart: DateTime.parse(
+        json['periodStart'] ?? DateTime.now().toIso8601String(),
+      ),
+      periodEnd: DateTime.parse(
+        json['periodEnd'] ?? DateTime.now().toIso8601String(),
+      ),
       totalRevenue: (json['totalRevenue'] ?? 0.0).toDouble(),
       totalOrders: json['totalOrders'] ?? 0,
       totalCustomers: json['totalCustomers'] ?? 0,
       averageOrderValue: (json['averageOrderValue'] ?? 0.0).toDouble(),
       salesByCategory: Map<String, int>.from(json['salesByCategory'] ?? {}),
-      topProducts: (json['topProducts'] as List<dynamic>?)
-          ?.map((product) => Product.fromJson(product))
-          .toList() ?? [],
+      topProducts:
+          (json['topProducts'] as List<dynamic>?)
+              ?.map((product) => Product.fromJson(product))
+              .toList() ??
+          [],
       revenueByDay: Map<String, double>.from(json['revenueByDay'] ?? {}),
       peakHours: List<String>.from(json['peakHours'] ?? []),
       customerRetentionRate: (json['customerRetentionRate'] ?? 0.0).toDouble(),
@@ -427,7 +451,7 @@ enum OrderStatus {
   outForDelivery,
   delivered,
   cancelled,
-  refunded
+  refunded,
 }
 
 enum PaymentStatus {
@@ -436,15 +460,80 @@ enum PaymentStatus {
   completed,
   failed,
   refunded,
-  partiallyRefunded
+  partiallyRefunded,
 }
 
-enum PaymentMethod {
-  cash,
-  card,
-  upi,
-  wallet,
-  netBanking
+enum PaymentMethod { cash, card, upi, wallet, netBanking }
+
+class NotificationSettings {
+  final bool orderNotifications;
+  final bool paymentNotifications;
+  final bool reviewNotifications;
+  final bool promotionNotifications;
+  final bool systemNotifications;
+  final bool emailNotifications;
+  final bool smsNotifications;
+  final bool pushNotifications;
+
+  NotificationSettings({
+    this.orderNotifications = true,
+    this.paymentNotifications = true,
+    this.reviewNotifications = true,
+    this.promotionNotifications = false,
+    this.systemNotifications = true,
+    this.emailNotifications = true,
+    this.smsNotifications = false,
+    this.pushNotifications = true,
+  });
+
+  factory NotificationSettings.fromJson(Map<String, dynamic> json) {
+    return NotificationSettings(
+      orderNotifications: json['orderNotifications'] ?? true,
+      paymentNotifications: json['paymentNotifications'] ?? true,
+      reviewNotifications: json['reviewNotifications'] ?? true,
+      promotionNotifications: json['promotionNotifications'] ?? false,
+      systemNotifications: json['systemNotifications'] ?? true,
+      emailNotifications: json['emailNotifications'] ?? true,
+      smsNotifications: json['smsNotifications'] ?? false,
+      pushNotifications: json['pushNotifications'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'orderNotifications': orderNotifications,
+      'paymentNotifications': paymentNotifications,
+      'reviewNotifications': reviewNotifications,
+      'promotionNotifications': promotionNotifications,
+      'systemNotifications': systemNotifications,
+      'emailNotifications': emailNotifications,
+      'smsNotifications': smsNotifications,
+      'pushNotifications': pushNotifications,
+    };
+  }
+
+  NotificationSettings copyWith({
+    bool? orderNotifications,
+    bool? paymentNotifications,
+    bool? reviewNotifications,
+    bool? promotionNotifications,
+    bool? systemNotifications,
+    bool? emailNotifications,
+    bool? smsNotifications,
+    bool? pushNotifications,
+  }) {
+    return NotificationSettings(
+      orderNotifications: orderNotifications ?? this.orderNotifications,
+      paymentNotifications: paymentNotifications ?? this.paymentNotifications,
+      reviewNotifications: reviewNotifications ?? this.reviewNotifications,
+      promotionNotifications:
+          promotionNotifications ?? this.promotionNotifications,
+      systemNotifications: systemNotifications ?? this.systemNotifications,
+      emailNotifications: emailNotifications ?? this.emailNotifications,
+      smsNotifications: smsNotifications ?? this.smsNotifications,
+      pushNotifications: pushNotifications ?? this.pushNotifications,
+    );
+  }
 }
 
 extension OrderStatusExtension on OrderStatus {

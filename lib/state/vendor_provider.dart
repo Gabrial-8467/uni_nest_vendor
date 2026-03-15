@@ -386,6 +386,37 @@ class VendorProvider extends ChangeNotifier {
     }
   }
 
+  // Update notification settings
+  Future<bool> updateNotificationSettings(
+    NotificationSettings notificationSettings,
+  ) async {
+    if (!_isAuthenticated || _authToken == null || _currentVendor == null) {
+      return false;
+    }
+
+    _setLoading(true);
+    _error = null;
+
+    try {
+      // Update the vendor's notification settings
+      final updatedVendor = _currentVendor!.copyWith(
+        notificationSettings: notificationSettings,
+      );
+
+      _currentVendor = updatedVendor;
+      await _saveAuthState();
+
+      SecureLogger.info('Notification settings updated', tag: 'NOTIFICATIONS');
+      return true;
+    } catch (e) {
+      _error = 'Failed to update notification settings: ${e.toString()}';
+      SecureLogger.error('Failed to update notification settings', error: e);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Create product
   Future<bool> createProduct(Map<String, dynamic> productData) async {
     if (!_isAuthenticated || _authToken == null || _currentVendor == null) {
@@ -623,5 +654,37 @@ class VendorProvider extends ChangeNotifier {
     _analyticsError = null;
     _earningsError = null;
     notifyListeners();
+  }
+
+  // Change password
+  Future<bool> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    _setLoading(true);
+    _error = null;
+
+    try {
+      final response = await VendorApiService.changePassword(
+        _authToken!,
+        currentPassword,
+        newPassword,
+      );
+
+      if (response['success'] == true) {
+        SecureLogger.info('Password changed successfully', tag: 'AUTH');
+        return true;
+      } else {
+        _error = response['message'] ?? 'Failed to change password';
+        SecureLogger.error('Password change failed: $_error', tag: 'AUTH');
+        return false;
+      }
+    } catch (e) {
+      _error = 'Failed to change password: $e';
+      SecureLogger.error('Password change error', error: e, tag: 'AUTH');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
   }
 }

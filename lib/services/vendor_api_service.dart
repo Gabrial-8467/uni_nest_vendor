@@ -156,6 +156,19 @@ class VendorApiService {
     );
   }
 
+  static Future<Map<String, dynamic>> changePassword(
+    String authToken,
+    String currentPassword,
+    String newPassword,
+  ) async {
+    return await _makeRequest(
+      'POST',
+      '/api/vendor/auth/change-password',
+      authToken: authToken,
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+  }
+
   // Vendor Profile Management
   static Future<Vendor> getVendorProfile(
     String vendorId,
