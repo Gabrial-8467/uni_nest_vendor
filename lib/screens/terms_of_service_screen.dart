@@ -28,21 +28,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.primary, // Red from logo
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 3,
-              width: 60,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    AppTheme.accent, // Yellow from logo
-                    AppTheme.secondary, // Blue from logo
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(2),
+                color: AppTheme.textPrimary,
               ),
             ),
             const SizedBox(height: 24),
@@ -123,39 +109,19 @@ class TermsOfServiceScreen extends StatelessWidget {
             const SizedBox(height: 40),
 
             Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      AppTheme.primary, // Red from logo
-                      AppTheme.accent, // Yellow from logo
-                    ],
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                  ),
-                  child: const Text(
-                    'I Understand and Agree',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                child: const Text(
+                  'I Understand and Agree',
+                  style: TextStyle(fontSize: 16),
                 ),
               ),
             ),
@@ -173,24 +139,12 @@ class TermsOfServiceScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  AppTheme.secondary, // Blue from logo
-                  AppTheme.accent, // Yellow from logo
-                ],
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -205,7 +159,7 @@ class TermsOfServiceScreen extends StatelessWidget {
                     height: 6,
                     margin: const EdgeInsets.only(top: 6, right: 12),
                     decoration: BoxDecoration(
-                      color: AppTheme.accent, // Yellow from logo
+                      color: AppTheme.primary,
                       shape: BoxShape.circle,
                     ),
                   ),
