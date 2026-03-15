@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_theme.dart';
-import 'live_chat_screen.dart';
+import '../widgets/widgets.dart';
+import '../screens/live_chat_screen.dart';
 
 class HelpAndSupportScreen extends StatefulWidget {
   const HelpAndSupportScreen({super.key});
@@ -64,6 +65,30 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                 Icons.lock_outline,
                 Colors.red,
               ),
+              _buildHelpItem(
+                'How to enable notifications?',
+                'Go to Profile > Notification Settings to configure email and push notifications.',
+                Icons.notifications_outlined,
+                Colors.purple,
+              ),
+              _buildHelpItem(
+                'How to track sales?',
+                'View the Dashboard tab to see real-time sales data and analytics.',
+                Icons.trending_up,
+                Colors.teal,
+              ),
+              _buildHelpItem(
+                'How to handle refunds?',
+                'Go to Orders > Select Order > Process Refund to issue customer refunds.',
+                Icons.currency_exchange,
+                Colors.amber,
+              ),
+              _buildHelpItem(
+                'How to update business hours?',
+                'Profile > Business Settings > Operating Hours to set your availability.',
+                Icons.schedule,
+                Colors.indigo,
+              ),
             ]),
 
             const SizedBox(height: 20),
@@ -120,25 +145,11 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                   () => _launchUrl('https://docs.uninest.com/vendor-guide'),
                 ),
                 _buildResourceItem(
-                  'Video Tutorials',
+                  'Step-by-step video tutorials',
                   'Step-by-step video tutorials',
                   Icons.play_circle,
                   Colors.red,
                   () => _launchUrl('https://tutorials.uninest.com/vendor'),
-                ),
-                _buildResourceItem(
-                  'FAQs',
-                  'Frequently asked questions',
-                  Icons.help_outline,
-                  Colors.orange,
-                  () => _launchUrl('https://faq.uninest.com/vendor'),
-                ),
-                _buildResourceItem(
-                  'API Documentation',
-                  'Technical documentation for developers',
-                  Icons.code,
-                  Colors.teal,
-                  () => _launchUrl('https://api.uninest.com/docs'),
                 ),
               ],
             ),
@@ -152,21 +163,36 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                 'Our terms and conditions',
                 Icons.description,
                 Colors.grey,
-                () => _launchUrl('https://uninest.com/terms'),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TermsOfServiceScreen(),
+                  ),
+                ),
               ),
               _buildResourceItem(
                 'Privacy Policy',
                 'How we handle your data',
                 Icons.security,
                 Colors.grey,
-                () => _launchUrl('https://uninest.com/privacy'),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PrivacyPolicyScreen(),
+                  ),
+                ),
               ),
               _buildResourceItem(
                 'Refund Policy',
                 'Our refund and return policies',
                 Icons.currency_exchange,
                 Colors.grey,
-                () => _launchUrl('https://uninest.com/refunds'),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RefundPolicyScreen(),
+                  ),
+                ),
               ),
             ]),
 

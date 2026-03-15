@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
+import '../widgets/widgets.dart';
+import 'package:flutter/gestures.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -335,13 +337,23 @@ class _SignupScreenState extends State<SignupScreen> {
                             fontSize: 14,
                             color: AppTheme.textSecondary,
                           ),
-                          children: const [
+                          children: [
                             TextSpan(
                               text: 'Terms of Service',
                               style: TextStyle(
                                 color: AppTheme.primary,
                                 fontWeight: FontWeight.w600,
                               ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const TermsOfServiceScreen(),
+                                    ),
+                                  );
+                                },
                             ),
                             TextSpan(text: ' and '),
                             TextSpan(
@@ -350,6 +362,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                 color: AppTheme.primary,
                                 fontWeight: FontWeight.w600,
                               ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const PrivacyPolicyScreen(),
+                                    ),
+                                  );
+                                },
                             ),
                           ],
                         ),
