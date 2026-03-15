@@ -80,18 +80,49 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                   () => _launchPhone('+18002346378'),
                 ),
                 _buildContactItem(
-                  'Email Support',
-                  'Send us an email for detailed inquiries',
+                  'General Support',
+                  'Send us an email for general inquiries',
                   Icons.email,
                   Colors.blue,
                   'support@uninest.com',
-                  () => _launchEmail('support@uninest.com'),
+                  () => _launchEmail(
+                    'support@uninest.com',
+                    subject: 'General Support Request - UNI NEST Vendor',
+                    body:
+                        'Hello UNI NEST Support,\n\nI need help with:\n\n[Please describe your issue here]\n\nThank you,\n[Your Name]\nVendor ID: [Your Vendor ID]',
+                  ),
+                ),
+                _buildContactItem(
+                  'Technical Support',
+                  'Get help with technical issues and bugs',
+                  Icons.bug_report,
+                  Colors.orange,
+                  'tech@uninest.com',
+                  () => _launchEmail(
+                    'tech@uninest.com',
+                    subject: 'Technical Support Request - UNI NEST Vendor',
+                    body:
+                        'Hello UNI NEST Technical Support,\n\nI am experiencing a technical issue:\n\nIssue Type: [Bug/Error/Feature Request]\nDescription: [Please describe the technical issue]\nSteps to reproduce: [If applicable]\nExpected behavior: [What should happen]\nActual behavior: [What actually happened]\n\nDevice/Platform: [Your device info]\nApp Version: 1.0.0\n\nThank you,\n[Your Name]',
+                  ),
+                ),
+                _buildContactItem(
+                  'Billing Support',
+                  'Questions about payments and billing',
+                  Icons.payment,
+                  Colors.purple,
+                  'billing@uninest.com',
+                  () => _launchEmail(
+                    'billing@uninest.com',
+                    subject: 'Billing Inquiry - UNI NEST Vendor',
+                    body:
+                        'Hello UNI NEST Billing Support,\n\nI have a question about billing:\n\nInquiry Type: [Payment Issue/Invoice Question/Pricing/Refund]\nDescription: [Please describe your billing question]\n\nOrder/Invoice ID: [If applicable]\nAmount: [If applicable]\nDate: [If applicable]\n\nThank you,\n[Your Name]\nVendor ID: [Your Vendor ID]',
+                  ),
                 ),
                 _buildContactItem(
                   'Live Chat',
                   'Chat with our support team in real-time',
                   Icons.chat,
-                  Colors.purple,
+                  Colors.teal,
                   'Start Chat',
                   () => _launchChat(),
                 ),
@@ -436,11 +467,44 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
     }
   }
 
-  Future<void> _launchEmail(String email) async {
-    final Uri emailUri = Uri(scheme: 'mailto', path: email);
+  Future<void> _launchEmail(
+    String email, {
+    String? subject,
+    String? body,
+  }) async {
+    final Map<String, String> queryParams = {};
+    if (subject != null) queryParams['subject'] = subject;
+    if (body != null) queryParams['body'] = body;
+
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: email,
+      query: _encodeQueryParameters(queryParams),
+    );
     if (await canLaunchUrl(emailUri)) {
       await launchUrl(emailUri);
+    } else {
+      // Show a message that the email couldn't be launched
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open email app. Please check your email settings.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  String? _encodeQueryParameters(Map<String, String> params) {
+    return params.entries
+        .map(
+          (e) =>
+              '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
+        )
+        .join('&');
   }
 
   Future<void> _launchUrl(String url) async {
