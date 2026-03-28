@@ -193,10 +193,7 @@ class ImageUploadService {
         final responseData = _decodeResponse(response.body);
 
         if (responseData['success'] == true) {
-          final imageUrl =
-              responseData['data']?['url'] ??
-              responseData['url'] ??
-              responseData['data']?['images']?[0]?['url'];
+          final imageUrl = _extractImageUrl(responseData);
 
           if (imageUrl != null) {
             SecureLogger.info('Image uploaded successfully: $imageUrl');
@@ -309,6 +306,58 @@ class ImageUploadService {
       SecureLogger.error('Failed to decode response', error: e);
       return {'message': responseBody};
     }
+  }
+
+  /// Extract a URL from heterogeneous upload response shapes.
+  static String? _extractImageUrl(Map<String, dynamic> responseData) {
+    String? read(dynamic value) {
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+      return null;
+    }
+
+    final data = responseData['data'];
+
+    // Common direct keys
+    final directCandidates = [
+      responseData['secure_url'],
+      responseData['imageUrl'],
+      responseData['url'],
+      data is Map<String, dynamic> ? data['secure_url'] : null,
+      data is Map<String, dynamic> ? data['imageUrl'] : null,
+      data is Map<String, dynamic> ? data['url'] : null,
+    ];
+    for (final candidate in directCandidates) {
+      final url = read(candidate);
+      if (url != null) return url;
+    }
+
+    // Nested image objects/lists
+    final images = data is Map<String, dynamic> ? data['images'] : null;
+    if (images is List && images.isNotEmpty) {
+      final first = images.first;
+      if (first is String) {
+        final url = read(first);
+        if (url != null) return url;
+      } else if (first is Map) {
+        final mapFirst = Map<String, dynamic>.from(first);
+        final url = read(mapFirst['secure_url']) ??
+            read(mapFirst['imageUrl']) ??
+            read(mapFirst['url']);
+        if (url != null) return url;
+      }
+    }
+
+    final image = data is Map<String, dynamic> ? data['image'] : null;
+    if (image is Map) {
+      final imageMap = Map<String, dynamic>.from(image);
+      return read(imageMap['secure_url']) ??
+          read(imageMap['imageUrl']) ??
+          read(imageMap['url']);
+    }
+
+    return null;
   }
 
   /// Validate image file

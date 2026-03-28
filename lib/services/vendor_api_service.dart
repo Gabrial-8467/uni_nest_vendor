@@ -470,6 +470,19 @@ class VendorApiService {
     Map<String, dynamic> productData,
     String authToken,
   ) async {
+    final images = productData['images'];
+    if (images is List) {
+      SecureLogger.info(
+        'PUT ${ApiEndpoints.productById(productId)} images payload (${images.length}): $images',
+        tag: 'PRODUCTS',
+      );
+    } else {
+      SecureLogger.warning(
+        'PUT ${ApiEndpoints.productById(productId)} missing valid images array. Found: ${images.runtimeType}',
+        tag: 'PRODUCTS',
+      );
+    }
+
     final response = await _makeRequest(
       ApiMethods.put,
       ApiEndpoints.productById(productId),

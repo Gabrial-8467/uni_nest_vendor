@@ -769,6 +769,18 @@ class _AddProductDialogState extends State<AddProductDialog> {
     });
   }
 
+  List<String> _normalizeImageUrls(Iterable<dynamic> urls) {
+    final merged = <String>[];
+    for (final item in urls) {
+      final value = item?.toString().trim() ?? '';
+      if (value.isEmpty) continue;
+      if (!merged.contains(value)) {
+        merged.add(value);
+      }
+    }
+    return merged;
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -809,12 +821,17 @@ class _AddProductDialogState extends State<AddProductDialog> {
       bool success;
       if (_isEdit) {
         // Edit flow keeps URL-based image handling.
-        List<String> allImageUrls = List.from(_uploadedImageUrls);
+        final existingImageUrls = _normalizeImageUrls(_uploadedImageUrls);
+        final allImageUrls = List<String>.from(existingImageUrls);
         SecureLogger.info(
           'Starting image upload. Product images: ${_productImageFiles.length}, Uploaded URLs: ${_uploadedImageUrls.length}',
         );
         SecureLogger.info('Base URL: ${ApiEndpoints.baseUrl}');
         SecureLogger.info('Endpoint: ${ApiEndpoints.uploadProductImages}');
+        SecureLogger.info(
+          'Existing images before upload merge: $existingImageUrls',
+          tag: 'PRODUCTS',
+        );
 
         if (_productImageFiles.isNotEmpty) {
           final authToken = vendorProvider.authToken;
@@ -835,7 +852,11 @@ class _AddProductDialogState extends State<AddProductDialog> {
 
           for (final result in uploadResults) {
             if (result.success && result.imageUrl != null) {
-              allImageUrls.add(result.imageUrl!);
+              final newImageUrl = result.imageUrl!.trim();
+              if (newImageUrl.isNotEmpty &&
+                  !allImageUrls.contains(newImageUrl)) {
+                allImageUrls.add(newImageUrl);
+              }
               SecureLogger.info(
                 'Successfully uploaded image: ${result.imageUrl}',
               );
@@ -870,7 +891,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
           }
         }
 
-        if (allImageUrls.isEmpty) {
+        final finalImageUrls = _normalizeImageUrls(allImageUrls);
+        if (finalImageUrls.isEmpty) {
           navigator.pop(); // Close loading dialog
           scaffoldMessenger.showSnackBar(
             const SnackBar(
@@ -883,12 +905,21 @@ class _AddProductDialogState extends State<AddProductDialog> {
           return;
         }
 
+        SecureLogger.info(
+          'Final images array for PUT /api/vendor/products/${widget.product.id}: $finalImageUrls',
+          tag: 'PRODUCTS',
+        );
+        SecureLogger.info(
+          'Final images count for update: ${finalImageUrls.length}',
+          tag: 'PRODUCTS',
+        );
+
         final productData = {
           'name': _nameController.text.trim(),
           'description': _descriptionController.text.trim(),
           'price': double.parse(_priceController.text),
           'category': normalizedCategory,
-          'images': allImageUrls,
+          'images': finalImageUrls,
           'isAvailable': _isAvailable,
           'stockQuantity': stockQuantity,
           'inStock': stockQuantity,
