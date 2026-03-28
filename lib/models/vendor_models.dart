@@ -1,5 +1,50 @@
 import 'package:flutter/material.dart';
 
+// Location Data Model
+class LocationData {
+  final List<double> coordinates; // [longitude, latitude]
+  final String address;
+  final String? landmark; // optional
+  final String city;
+  final String state;
+  final String pincode;
+
+  LocationData({
+    required this.coordinates,
+    required this.address,
+    this.landmark,
+    required this.city,
+    required this.state,
+    required this.pincode,
+  });
+
+  factory LocationData.fromJson(Map<String, dynamic> json) {
+    return LocationData(
+      coordinates:
+          (json['coordinates'] as List<dynamic>?)
+              ?.map((e) => (e as num).toDouble())
+              .toList() ??
+          [0.0, 0.0],
+      address: json['address']?.toString() ?? '',
+      landmark: json['landmark']?.toString(),
+      city: json['city']?.toString() ?? '',
+      state: json['state']?.toString() ?? '',
+      pincode: json['pincode']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'coordinates': coordinates,
+      'address': address,
+      if (landmark != null) 'landmark': landmark,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
+    };
+  }
+}
+
 // Vendor Models
 class Vendor {
   final String id;
@@ -8,7 +53,8 @@ class Vendor {
   final String phone;
   final String businessName;
   final String businessType;
-  final String location;
+  final String location; // Keep for backward compatibility
+  final LocationData? locationData; // New structured location
   final double rating;
   final bool isActive;
   final DateTime createdAt;
@@ -24,6 +70,7 @@ class Vendor {
     required this.businessName,
     required this.businessType,
     required this.location,
+    this.locationData,
     required this.rating,
     required this.isActive,
     required this.createdAt,
@@ -32,21 +79,49 @@ class Vendor {
     required this.notificationSettings,
   });
 
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static DateTime _parseDate(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
   factory Vendor.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] is Map
+        ? Map<String, dynamic>.from(json['user'])
+        : <String, dynamic>{};
+    final contactInfo = json['contactInfo'] is Map
+        ? Map<String, dynamic>.from(json['contactInfo'])
+        : <String, dynamic>{};
+    final rawRating = json['rating'];
+    final ratingValue = rawRating is Map
+        ? _toDouble(rawRating['average'])
+        : _toDouble(rawRating);
+    final status = (json['status'] ?? '').toString().toLowerCase();
+
     return Vendor(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
-      businessName: json['businessName'] ?? '',
-      businessType: json['businessType'] ?? '',
-      location: json['location'] ?? '',
-      rating: (json['rating'] ?? 0.0).toDouble(),
-      isActive: json['isActive'] ?? false,
-      createdAt: DateTime.parse(
-        json['createdAt'] ?? DateTime.now().toIso8601String(),
-      ),
-      profileImage: json['profileImage'],
+      id: (json['id'] ?? json['_id'] ?? user['_id'] ?? '').toString(),
+      name: (json['name'] ?? user['name'] ?? '').toString(),
+      email: (json['email'] ?? contactInfo['email'] ?? user['email'] ?? '')
+          .toString(),
+      phone: (json['phone'] ?? contactInfo['phone'] ?? user['phone'] ?? '')
+          .toString(),
+      businessName: (json['businessName'] ?? '').toString(),
+      businessType: (json['businessType'] ?? '').toString(),
+      location: (json['location'] ?? '').toString(),
+      locationData: json['location'] is Map
+          ? LocationData.fromJson(json['location'])
+          : null,
+      rating: ratingValue,
+      isActive: json['isActive'] == true || status == 'active',
+      createdAt: _parseDate(json['createdAt']),
+      profileImage: (json['profileImage'] ?? user['avatar'])?.toString(),
       businessDetails: json['businessDetails'] ?? {},
       notificationSettings: NotificationSettings.fromJson(
         json['notificationSettings'] ?? {},
@@ -63,6 +138,7 @@ class Vendor {
       'businessName': businessName,
       'businessType': businessType,
       'location': location,
+      if (locationData != null) 'location': locationData!.toJson(),
       'rating': rating,
       'isActive': isActive,
       'createdAt': createdAt.toIso8601String(),
@@ -141,6 +217,11 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final rawStock = json['stockQuantity'] ?? json['inStock'] ?? 0;
+    final stockValue = rawStock is int
+        ? rawStock
+        : int.tryParse(rawStock.toString()) ?? 0;
+
     return Product(
       id: json['id'] ?? '',
       vendorId: json['vendorId'] ?? '',
@@ -150,7 +231,7 @@ class Product {
       category: json['category'] ?? '',
       images: List<String>.from(json['images'] ?? []),
       isAvailable: json['isAvailable'] ?? true,
-      stockQuantity: json['stockQuantity'] ?? 0,
+      stockQuantity: stockValue,
       tags: List<String>.from(json['tags'] ?? []),
       nutritionalInfo: json['nutritionalInfo'] ?? {},
       createdAt: DateTime.parse(
@@ -488,9 +569,12 @@ class NotificationSettings {
 
   factory NotificationSettings.fromJson(Map<String, dynamic> json) {
     return NotificationSettings(
-      orderNotifications: json['orderNotifications'] ?? true,
-      paymentNotifications: json['paymentNotifications'] ?? true,
-      reviewNotifications: json['reviewNotifications'] ?? true,
+      orderNotifications:
+          json['orderNotifications'] ?? json['orderAlerts'] ?? true,
+      paymentNotifications:
+          json['paymentNotifications'] ?? json['paymentAlerts'] ?? true,
+      reviewNotifications:
+          json['reviewNotifications'] ?? json['reviewAlerts'] ?? true,
       promotionNotifications: json['promotionNotifications'] ?? false,
       systemNotifications: json['systemNotifications'] ?? true,
       emailNotifications: json['emailNotifications'] ?? true,

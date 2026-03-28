@@ -20,9 +20,10 @@ dependencies:
   flutter_secure_storage: ^9.0.0
   
   # Network
-  http: ^1.2.1
+  http: ^1.6.0
   dio: ^5.4.3
   url_launcher: ^6.2.4
+  connectivity_plus: ^6.0.3
   
   # Environment Configuration
   flutter_dotenv: ^5.1.0
@@ -34,7 +35,7 @@ dependencies:
   crypto: ^3.0.3
   
   # Image Handling
-  image_picker: ^1.1.2
+  image_picker: ^1.2.1
   cached_network_image: ^3.3.1
   
   # Charts and Analytics
@@ -47,9 +48,14 @@ dependencies:
   # File Handling
   file_picker: ^8.0.3
   path_provider: ^2.1.3
+  path: ^1.9.0
   
   # Permissions
   permission_handler: ^11.3.1
+  
+  # Location Services
+  geolocator: ^10.1.0
+  geocoding: ^2.1.1
   
   # Local Notifications
   flutter_local_notifications: ^17.2.2
@@ -57,6 +63,9 @@ dependencies:
   # Utilities
   uuid: ^4.4.0
   collection: ^1.18.0
+  package_info_plus: ^8.0.2
+  version: ^3.0.2
+  flutter_image_compress: ^2.4.0
 
 dev_dependencies:
   flutter_test:

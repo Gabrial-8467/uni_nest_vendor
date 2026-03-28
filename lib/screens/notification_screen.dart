@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
+import '../services/vendor_api_service.dart';
+import '../services/auth_service.dart';
+import '../utils/secure_logger.dart';
 
 class Notification {
   final String id;
@@ -30,6 +33,8 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   List<Notification> notifications = [];
+  bool isLoading = true;
+  String? error;
 
   @override
   void initState() {
@@ -37,51 +42,51 @@ class _NotificationScreenState extends State<NotificationScreen> {
     _loadNotifications();
   }
 
-  void _loadNotifications() {
-    // Sample notifications - in real app, these would come from API
-    notifications = [
-      Notification(
-        id: '1',
-        title: 'New Order Received',
-        message: 'Order #12345 has been placed for ₹1,299.00',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-        type: 'order',
-        data: {'orderId': '12345'},
-      ),
-      Notification(
-        id: '2',
-        title: 'Payment Received',
-        message: 'Payment of ₹2,500.00 received for Order #12340',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        type: 'payment',
-        data: {'orderId': '12340', 'amount': 2500.0},
-      ),
-      Notification(
-        id: '3',
-        title: 'Low Stock Alert',
-        message:
-            'Product "Wireless Headphones" is running low on stock (5 units left)',
-        timestamp: DateTime.now().subtract(const Duration(hours: 4)),
-        type: 'system',
-        data: {'productId': 'prod_123', 'stock': 5},
-      ),
-      Notification(
-        id: '4',
-        title: 'System Maintenance',
-        message: 'Scheduled maintenance on Sunday 2:00 AM - 4:00 AM',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        type: 'system',
-        isRead: true,
-      ),
-      Notification(
-        id: '5',
-        title: 'Promotional Opportunity',
-        message: 'Boost your sales with our weekend promotion campaign',
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        type: 'promotion',
-        isRead: true,
-      ),
-    ];
+  Future<void> _loadNotifications() async {
+    try {
+      final authToken = await AuthService().getAuthToken();
+      if (authToken == null) {
+        setState(() {
+          isLoading = false;
+          error = 'Not authenticated';
+        });
+        return;
+      }
+
+      final response = await VendorApiService.getNotifications(authToken);
+
+      if (response['success'] == true && response['data'] != null) {
+        final notificationsData =
+            response['data']['notifications'] as List? ?? [];
+        setState(() {
+          notifications = notificationsData.map((notif) {
+            return Notification(
+              id: notif['_id']?.toString() ?? '',
+              title: notif['title']?.toString() ?? 'No Title',
+              message: notif['message']?.toString() ?? 'No Message',
+              timestamp:
+                  DateTime.tryParse(notif['createdAt']?.toString() ?? '') ??
+                  DateTime.now(),
+              type: notif['type']?.toString() ?? 'system',
+              isRead: notif['status']?.toString() == 'read',
+              data: notif['data'] as Map<String, dynamic>?,
+            );
+          }).toList();
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+          error = response['message'] ?? 'Failed to load notifications';
+        });
+      }
+    } catch (e) {
+      SecureLogger.error('Failed to load notifications', error: e);
+      setState(() {
+        isLoading = false;
+        error = 'Failed to load notifications';
+      });
+    }
   }
 
   void _markAsRead(String notificationId) {
@@ -178,7 +183,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
         ],
       ),
-      body: notifications.isEmpty
+      body: isLoading
+          ? _buildLoadingState()
+          : error != null
+          ? _buildErrorState()
+          : notifications.isEmpty
           ? _buildEmptyState()
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -188,6 +197,48 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 return _buildNotificationItem(notification);
               },
             ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading notifications',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.red[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error ?? 'Something went wrong',
+            style: TextStyle(fontSize: 14, color: Colors.red[400]),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadNotifications,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
     );
   }
 

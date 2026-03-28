@@ -126,7 +126,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   '₹${vendorProvider.totalRevenue.toStringAsFixed(2)}',
                   Icons.trending_up,
                   Colors.green,
-                  '+15.3%',
+                  '${vendorProvider.revenueGrowthPercentage >= 0 ? '+' : ''}${vendorProvider.revenueGrowthPercentage.toStringAsFixed(1)}%',
                 ),
               ),
               const SizedBox(width: 12),
@@ -136,14 +136,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   '₹${(vendorProvider.totalRevenue / (vendorProvider.orders.isNotEmpty ? vendorProvider.orders.length : 1)).toStringAsFixed(2)}',
                   Icons.receipt_long,
                   Colors.blue,
-                  '+8.7%',
+                  '${vendorProvider.averageOrderValueGrowth >= 0 ? '+' : ''}${vendorProvider.averageOrderValueGrowth.toStringAsFixed(1)}%',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           // Revenue Chart
-          _buildRevenueChart(),
+          _buildRevenueChart(vendorProvider),
           const SizedBox(height: 16),
           // Revenue by Category
           _buildRevenueByCategory(vendorProvider),
@@ -166,7 +166,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   vendorProvider.orders.length.toString(),
                   Icons.shopping_cart,
                   Colors.orange,
-                  '+12.5%',
+                  '${vendorProvider.ordersGrowthPercentage >= 0 ? '+' : ''}${vendorProvider.ordersGrowthPercentage.toStringAsFixed(1)}%',
                 ),
               ),
               const SizedBox(width: 12),
@@ -366,7 +366,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   vendorProvider.products.length.toString(),
                   Icons.inventory,
                   Colors.purple,
-                  '+2 new',
+                  '+${vendorProvider.newProductsCount} new',
                 ),
               ),
               const SizedBox(width: 12),
@@ -379,7 +379,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       .toString(),
                   Icons.check_circle,
                   Colors.teal,
-                  '85% active',
+                  vendorProvider.products.isNotEmpty
+                      ? '${((vendorProvider.products.where((p) => p.isAvailable).length / vendorProvider.products.length) * 100).toInt()}% active'
+                      : '0% active',
                 ),
               ),
             ],
@@ -660,7 +662,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-  Widget _buildRevenueChart() {
+  Widget _buildRevenueChart(VendorProvider vendorProvider) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -699,15 +701,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 maxY: 6000,
                 lineBarsData: [
                   LineChartBarData(
-                    spots: const [
-                      FlSpot(1, 2500),
-                      FlSpot(2, 3200),
-                      FlSpot(3, 2800),
-                      FlSpot(4, 4500),
-                      FlSpot(5, 3800),
-                      FlSpot(6, 4200),
-                      FlSpot(7, 3500),
-                    ],
+                    spots: List.generate(7, (index) {
+                      final dailyRevenue = vendorProvider.dailyRevenueLast7Days;
+                      return FlSpot(
+                        (index + 1).toDouble(),
+                        dailyRevenue[index],
+                      );
+                    }),
                     isCurved: true,
                     gradient: LinearGradient(
                       colors: [
@@ -754,24 +754,46 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       const Color(0xFFE67E22),
     ];
 
-    // Calculate revenue for each category
-    final categoryData = <String, double>{};
+    // Calculate revenue by category from actual sold order items.
+    final productCategoryById = <String, String>{};
+    final productCategoryByName = <String, String>{};
     for (final product in vendorProvider.products) {
-      final category = product.category;
-      if (categoryData.containsKey(category)) {
-        categoryData[category] = categoryData[category]! + product.price;
-      } else {
-        categoryData[category] = product.price;
+      final normalizedCategory = product.category.trim().isEmpty
+          ? 'Uncategorized'
+          : product.category.trim();
+      productCategoryById[product.id] = normalizedCategory;
+      productCategoryByName[product.name.trim().toLowerCase()] =
+          normalizedCategory;
+    }
+
+    final categoryData = <String, double>{};
+    for (final order in vendorProvider.orders) {
+      for (final item in order.items) {
+        final category =
+            productCategoryById[item.productId] ??
+            productCategoryByName[item.productName.trim().toLowerCase()] ??
+            'Uncategorized';
+        final itemRevenue = item.totalPrice > 0
+            ? item.totalPrice
+            : (item.unitPrice * item.quantity);
+        categoryData.update(
+          category,
+          (current) => current + itemRevenue,
+          ifAbsent: () => itemRevenue,
+        );
       }
     }
 
-    final totalRevenue = categoryData.values.fold(
+    final sortedCategoryData = categoryData.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final totalRevenue = sortedCategoryData.fold<double>(
       0.0,
-      (sum, value) => sum + value,
+      (sum, entry) => sum + entry.value,
     );
 
     // Show empty state if no categories
-    if (categoryData.isEmpty) {
+    if (sortedCategoryData.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -814,7 +836,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No categories available',
+                    'No category revenue available',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -823,7 +845,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Add products with categories to see the chart',
+                    'Complete some orders to see revenue split by category',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
@@ -871,8 +893,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     PieChartData(
                       sectionsSpace: 2,
                       centerSpaceRadius: 60,
-                      sections: categoryData.entries
-                          .toList()
+                      sections: sortedCategoryData
                           .asMap()
                           .entries
                           .map((entry) {
@@ -908,7 +929,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: categoryData.entries.toList().asMap().entries.map((
+                    children: sortedCategoryData.asMap().entries.map((
                       entry,
                     ) {
                       final index = entry.key;

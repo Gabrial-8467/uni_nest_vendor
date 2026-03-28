@@ -151,7 +151,11 @@ class RevenueChartWidget extends StatelessWidget {
                 '₹${(vendorProvider.totalRevenue / 7).toStringAsFixed(2)}',
                 Colors.blue,
               ),
-              _buildLegendItem('Peak Day', 'Thursday', Colors.orange),
+              _buildLegendItem(
+                'Peak Day',
+                vendorProvider.peakRevenueDay,
+                Colors.orange,
+              ),
             ],
           ),
         ],
@@ -160,16 +164,11 @@ class RevenueChartWidget extends StatelessWidget {
   }
 
   List<FlSpot> _getRevenueSpots() {
-    // Sample data for the last 7 days
-    return [
-      const FlSpot(1, 2500),
-      const FlSpot(2, 3200),
-      const FlSpot(3, 2800),
-      const FlSpot(4, 4500),
-      const FlSpot(5, 3800),
-      const FlSpot(6, 4200),
-      const FlSpot(7, 3500),
-    ];
+    final dailyRevenue = vendorProvider.dailyRevenueLast7Days;
+
+    return List.generate(7, (index) {
+      return FlSpot((index + 1).toDouble(), dailyRevenue[index]);
+    });
   }
 
   Widget _buildLegendItem(String label, String value, Color color) {

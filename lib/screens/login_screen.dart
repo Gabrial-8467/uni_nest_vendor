@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_assets.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -80,14 +81,16 @@ class _LoginScreenState extends State<LoginScreen> {
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 40),
-                    _buildHeader(),
-                    const SizedBox(height: 40),
-                    _buildLoginForm(),
-                  ],
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 40),
+                      _buildHeader(),
+                      const SizedBox(height: 40),
+                      _buildLoginForm(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -122,21 +125,10 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 32),
         // Logo
         Center(
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: AppTheme.primaryGradient),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 25,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.store, size: 50, color: AppTheme.textWhite),
+          child: AppLogo(
+            size: AppAssets.logoSizeMedium,
+            withGradient: false, // Changed to false for white background
+            borderRadius: 25.0,
           ),
         ),
       ],
@@ -399,9 +391,13 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login successful!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.red,
           ),
         );
+        // Navigate to dashboard after successful login
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/dashboard', (route) => false);
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -5,8 +5,13 @@ import '../utils/app_theme.dart';
 
 class RecentOrdersWidget extends StatelessWidget {
   final VendorProvider vendorProvider;
+  final VoidCallback? onViewAll;
 
-  const RecentOrdersWidget({super.key, required this.vendorProvider});
+  const RecentOrdersWidget({
+    super.key,
+    required this.vendorProvider,
+    this.onViewAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -46,9 +51,7 @@ class RecentOrdersWidget extends StatelessWidget {
               ),
               const Spacer(),
               TextButton(
-                onPressed: () {
-                  // Navigate to all orders
-                },
+                onPressed: onViewAll,
                 child: const Text(
                   'View All',
                   style: TextStyle(

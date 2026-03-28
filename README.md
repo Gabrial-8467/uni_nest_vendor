@@ -1,6 +1,8 @@
 # UNI NEST Vendor
 
-A comprehensive Flutter application for vendors to manage their business operations, orders, products, and privacy settings.
+**Version 1.0.0+1**
+
+A comprehensive Flutter application for vendors to manage their business operations, orders, products, and privacy settings. Built with modern architecture and enhanced security features.
 
 ## Features
 
@@ -15,6 +17,10 @@ A comprehensive Flutter application for vendors to manage their business operati
 - **Privacy Settings**: Granular control over data sharing and profile visibility
 - **Notification System**: Customizable notifications for orders, payments, and updates
 - **Multi-platform Support**: Runs on Android, iOS, Web, Windows, macOS, and Linux
+- **Secure Storage**: Encrypted local storage for sensitive data
+- **File Management**: Image and file upload capabilities
+- **Advanced Analytics**: Interactive charts and business metrics
+- **Environment Configuration**: Secure environment variable management
 
 ## Project Structure
 
@@ -65,7 +71,7 @@ Comprehensive data models with proper JSON serialization:
 ## Getting Started
 
 ### Prerequisites
-- Flutter SDK (version 3.0 or higher)
+- Flutter SDK (version 3.11.1 or higher)
 - Dart SDK
 - Android Studio / VS Code with Flutter extensions
 
@@ -82,7 +88,13 @@ cd uni_nest_vendor
 flutter pub get
 ```
 
-3. Run the application:
+3. Set up environment variables:
+```bash
+# Create a .env file in the root directory
+# Add your API keys and configuration variables
+```
+
+4. Run the application:
 ```bash
 flutter run
 ```
@@ -113,8 +125,20 @@ The application follows a clean architecture pattern:
 Key dependencies include:
 - `provider`: State management
 - `shared_preferences`: Local storage
+- `flutter_secure_storage`: Secure local storage
 - `http`: API communications
-- `material_design_icons_flutter`: UI icons
+- `dio`: HTTP client with interceptors
+- `fl_chart`: Charts and analytics
+- `image_picker`: Image handling
+- `cached_network_image`: Network image caching
+- `flutter_local_notifications`: Local notifications
+- `flutter_dotenv`: Environment configuration
+- `url_launcher`: URL launching
+- `file_picker`: File handling
+- `permission_handler`: Permissions management
+- `crypto`: Cryptographic functions
+- `uuid`: UUID generation
+- `intl`: Internationalization and date formatting
 
 ## Contributing
 

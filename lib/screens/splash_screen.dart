@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_assets.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToAuth() {
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/dashboard');
+        Navigator.of(context).pushReplacementNamed('/auth');
       }
     });
   }
@@ -76,35 +77,16 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Logo Container
-                        Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            color: AppTheme.surface,
-                            borderRadius: BorderRadius.circular(35),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 30,
-                                offset: const Offset(0, 15),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(35),
-                            child: Image.asset(
-                              'assets/images/uninest.jpeg',
-                              width: 140,
-                              height: 140,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+                        // Logo
+                        AppLogo(
+                          size: AppAssets.logoSizeLarge,
+                          withGradient: false,
+                          borderRadius: 35.0,
                         ),
                         const SizedBox(height: 40),
                         // App Name
                         const Text(
-                          'UNI NEST',
+                          'UNINEST',
                           style: TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.bold,

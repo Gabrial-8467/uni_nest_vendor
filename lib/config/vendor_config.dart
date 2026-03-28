@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'environment_config.dart';
 
 class VendorConfig {
   // Environment configuration
@@ -21,29 +22,22 @@ class VendorConfig {
   // API Configuration
   static String get apiBaseUrl {
     final envUrl = dotenv.env['VENDOR_API_BASE_URL'];
-    if (envUrl != null && envUrl.isNotEmpty) {
-      return envUrl;
+    final rawUrl =
+        (envUrl != null && envUrl.isNotEmpty)
+        ? envUrl
+        : EnvironmentConfig.apiBaseUrl;
+
+    // Android emulators cannot reach host machine via localhost/127.0.0.1.
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        (rawUrl.contains('://localhost') || rawUrl.contains('://127.0.0.1'))) {
+      return rawUrl
+          .replaceFirst('://localhost', '://10.0.2.2')
+          .replaceFirst('://127.0.0.1', '://10.0.2.2');
     }
 
-    // Fallback for development
-    if (isDebugMode) {
-      return 'http://127.0.0.1:5000';
-    }
-
-    // Production fallback
-    return 'https://api.uninest.com';
+    return rawUrl;
   }
-
-  // API Endpoints
-  static const String authEndpoint = '/api/vendor/auth';
-  static const String profileEndpoint = '/api/vendor/profile';
-  static const String productsEndpoint = '/api/vendor/products';
-  static const String ordersEndpoint = '/api/vendor/orders';
-  static const String analyticsEndpoint = '/api/vendor/analytics';
-  static const String earningsEndpoint = '/api/vendor/earnings';
-  static const String customersEndpoint = '/api/vendor/customers';
-  static const String notificationsEndpoint = '/api/vendor/notifications';
-  static const String settingsEndpoint = '/api/vendor/settings';
 
   // Network Configuration
   static Duration get connectionTimeout {
@@ -51,7 +45,7 @@ class VendorConfig {
     if (timeoutSeconds != null && timeoutSeconds.isNotEmpty) {
       return Duration(seconds: int.tryParse(timeoutSeconds) ?? 30);
     }
-    return const Duration(seconds: 30);
+    return EnvironmentConfig.timeoutDuration;
   }
 
   static Duration get receiveTimeout {
@@ -59,15 +53,7 @@ class VendorConfig {
     if (timeoutSeconds != null && timeoutSeconds.isNotEmpty) {
       return Duration(seconds: int.tryParse(timeoutSeconds) ?? 30);
     }
-    return const Duration(seconds: 30);
-  }
-
-  static int get maxRetries {
-    final retries = dotenv.env['MAX_RETRIES'];
-    if (retries != null && retries.isNotEmpty) {
-      return int.tryParse(retries) ?? 3;
-    }
-    return 3;
+    return EnvironmentConfig.timeoutDuration;
   }
 
   // Security Configuration
@@ -76,15 +62,44 @@ class VendorConfig {
     if (enforce != null && enforce.isNotEmpty) {
       return enforce.toLowerCase() == 'true';
     }
-    return isReleaseMode;
-  }
-
-  static String get encryptionKey {
-    return dotenv.env['ENCRYPTION_KEY'] ?? 'default_encryption_key_32_chars';
+    return EnvironmentConfig.isProduction;
   }
 
   static String get jwtSecret {
-    return dotenv.env['JWT_SECRET'] ?? 'default_jwt_secret_key';
+    final secret = dotenv.env['JWT_SECRET'];
+    if (secret != null && secret.isNotEmpty) {
+      return secret;
+    }
+    return EnvironmentConfig.jwtSecret;
+  }
+
+  // Session Management
+  static Duration get sessionTimeout =>
+      EnvironmentConfig.sessionTimeoutDuration;
+
+  // API Rate Limiting
+  static int get maxRetries {
+    final retries = dotenv.env['MAX_RETRIES'];
+    if (retries != null && retries.isNotEmpty) {
+      return int.tryParse(retries) ?? 3;
+    }
+    return 3;
+  }
+
+  // Production Environment Check
+  static bool get isProductionReady {
+    if (isReleaseMode) {
+      return EnvironmentConfig.isProduction &&
+          jwtSecret != 'your_jwt_secret_key_here' &&
+          enforceHttps;
+    }
+    return true;
+  }
+
+  // Data Retention
+  static Duration get dataRetentionPeriod {
+    final days = dotenv.env['DATA_RETENTION_DAYS'];
+    return Duration(days: int.tryParse(days ?? '') ?? 90);
   }
 
   // Feature Flags
@@ -192,7 +207,12 @@ class VendorConfig {
 
   // Image Upload Configuration
   static const int maxImageSize = 5 * 1024 * 1024; // 5MB
-  static const List<String> allowedImageFormats = ['jpg', 'jpeg', 'png', 'webp'];
+  static const List<String> allowedImageFormats = [
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+  ];
   static const int maxImagesPerProduct = 5;
 
   // Pagination Configuration
@@ -235,7 +255,8 @@ class VendorConfig {
       url = url.replaceFirst('http://', 'https://');
     }
 
-    if (isDebugMode && (url.contains('localhost') || url.contains('127.0.0.1'))) {
+    if (isDebugMode &&
+        (url.contains('localhost') || url.contains('127.0.0.1'))) {
       debugPrint(
         '⚠️ WARNING: Using localhost/127.0.0.1. This won\'t work on physical devices!',
       );
@@ -256,7 +277,9 @@ class VendorConfig {
   static String getSecureBaseUrl() {
     final url = validateAndGetBaseUrl();
     if (enforceHttps && !isSecureUrl(url)) {
-      throw Exception('Insecure URL detected. HTTPS is required in production mode.');
+      throw Exception(
+        'Insecure URL detected. HTTPS is required in production mode.',
+      );
     }
     return url;
   }

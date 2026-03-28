@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_assets.dart';
 import '../widgets/widgets.dart';
 import 'package:flutter/gestures.dart';
 
@@ -117,8 +118,17 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildHeader() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Logo at the top
+        Center(
+          child: AppLogo(
+            size: AppAssets.logoSizeMedium,
+            withGradient: false,
+            borderRadius: 25.0,
+          ),
+        ),
+        const SizedBox(height: 32),
+        // Title and subtitle
         const Text(
           'Create Account',
           style: TextStyle(
@@ -137,30 +147,7 @@ class _SignupScreenState extends State<SignupScreen> {
             fontWeight: FontWeight.w400,
           ),
         ),
-        const SizedBox(height: 20),
-        // Logo
-        Center(
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: AppTheme.primaryGradient),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 25,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.person_add,
-              size: 50,
-              color: AppTheme.textWhite,
-            ),
-          ),
-        ),
+        const SizedBox(height: 32),
       ],
     );
   }

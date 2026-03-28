@@ -4,6 +4,8 @@ import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 import '../models/vendor_models.dart';
 import 'help_and_support_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,7 +22,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _businessNameController = TextEditingController();
   final _businessTypeController = TextEditingController();
   final _locationController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _landmarkController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pincodeController = TextEditingController();
   bool _isEditing = false;
+  String? _lastVendorId;
 
   void _showChangePasswordDialog() {
     showDialog(
@@ -44,6 +52,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _businessNameController.dispose();
     _businessTypeController.dispose();
     _locationController.dispose();
+    _addressController.dispose();
+    _landmarkController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
     super.dispose();
   }
 
@@ -53,15 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context, vendorProvider, child) {
         final vendor = vendorProvider.currentVendor;
 
-        // Initialize controllers with vendor data
-        if (vendor != null) {
-          _nameController.text = vendor.name;
-          _emailController.text = vendor.email;
-          _phoneController.text = vendor.phone;
-          _businessNameController.text = vendor.businessName;
-          _businessTypeController.text = vendor.businessType;
-          _locationController.text = vendor.location;
-        }
+        // Keep form fields in sync with backend data, but do not overwrite while editing.
+        _syncControllersIfNeeded(vendor);
 
         return Scaffold(
           backgroundColor: AppTheme.background,
@@ -91,90 +97,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  // Profile Header
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0D000000), // Black with 5% opacity
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    vendor?.businessName ?? 'Your Business',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF2D3436),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    vendor?.email ?? 'vendor@example.com',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${vendor?.businessType ?? 'Business Type'} • ${vendor?.location ?? 'Location'}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: AppTheme.primary.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                ),
-                              ),
-                              child: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditing = !_isEditing;
-                                  });
-                                },
-                                icon: Icon(
-                                  _isEditing
-                                      ? Icons.check
-                                      : Icons.edit_outlined,
-                                  color: AppTheme.primary,
-                                  size: 20,
-                                ),
-                                tooltip: _isEditing
-                                    ? 'Save Changes'
-                                    : 'Edit Profile',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  _buildProfileHeader(vendor),
+                  const SizedBox(height: 16),
                   // Profile Form - Only show when editing
                   _isEditing
                       ? Container(
@@ -272,15 +196,96 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 },
                               ),
                               const SizedBox(height: 16),
+                              // Address Field
                               TextFormField(
-                                controller: _locationController,
-                                decoration: _buildInputDecoration('Location'),
+                                controller: _addressController,
+                                decoration: _buildInputDecoration('Address'),
+                                maxLines: 2,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Please enter your location';
+                                    return 'Please enter your address';
+                                  }
+                                  if (value.length > 500) {
+                                    return 'Address must be less than 500 characters';
                                   }
                                   return null;
                                 },
+                              ),
+                              const SizedBox(height: 16),
+                              // Landmark Field (Optional)
+                              TextFormField(
+                                controller: _landmarkController,
+                                decoration: _buildInputDecoration(
+                                  'Landmark (Optional)',
+                                ),
+                                validator: (value) {
+                                  if (value != null && value.length > 200) {
+                                    return 'Landmark must be less than 200 characters';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              // City Field
+                              TextFormField(
+                                controller: _cityController,
+                                decoration: _buildInputDecoration('City'),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your city';
+                                  }
+                                  if (value.length > 100) {
+                                    return 'City must be less than 100 characters';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              // State Field
+                              TextFormField(
+                                controller: _stateController,
+                                decoration: _buildInputDecoration('State'),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your state';
+                                  }
+                                  if (value.length > 100) {
+                                    return 'State must be less than 100 characters';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              // Pincode Field
+                              TextFormField(
+                                controller: _pincodeController,
+                                decoration: _buildInputDecoration('Pincode'),
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your pincode';
+                                  }
+                                  if (!RegExp(r'^[0-9]{6}$').hasMatch(value)) {
+                                    return 'Pincode must be exactly 6 digits';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              // Use Current Location Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _getCurrentLocation,
+                                  icon: const Icon(Icons.location_on_outlined),
+                                  label: const Text('Use My Current Location'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.primary,
+                                    side: const BorderSide(
+                                      color: AppTheme.primary,
+                                    ),
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 24),
                               Row(
@@ -339,7 +344,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                         )
-                      : const SizedBox.shrink(),
+                      : _buildBusinessDetailsCard(vendor),
                   const SizedBox(height: 20),
                   // Account Actions
                   Container(
@@ -400,10 +405,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Icons.logout,
                           Colors.red,
                           () async {
-                            await vendorProvider.logout();
-                            if (mounted && context.mounted) {
-                              _navigateToLogin(context);
-                            }
+                            _showLogoutConfirmation(context);
                           },
                         ),
                       ],
@@ -415,6 +417,297 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _syncControllersIfNeeded(Vendor? vendor) {
+    if (vendor == null) return;
+    if (_isEditing) return;
+    if (_lastVendorId == vendor.id) return;
+
+    _nameController.text = vendor.name;
+    _emailController.text = vendor.email;
+    _phoneController.text = vendor.phone;
+    _businessNameController.text = vendor.businessName;
+    _businessTypeController.text = vendor.businessType;
+
+    // Handle location data
+    if (vendor.locationData != null) {
+      _addressController.text = vendor.locationData!.address;
+      _landmarkController.text = vendor.locationData!.landmark ?? '';
+      _cityController.text = vendor.locationData!.city;
+      _stateController.text = vendor.locationData!.state;
+      _pincodeController.text = vendor.locationData!.pincode;
+      // Update backward compatibility location field
+      _locationController.text =
+          '${vendor.locationData!.city}, ${vendor.locationData!.state}';
+    } else {
+      _addressController.text = '';
+      _landmarkController.text = '';
+      _cityController.text = '';
+      _stateController.text = '';
+      _pincodeController.text = '';
+      _locationController.text = vendor.location;
+    }
+
+    _lastVendorId = vendor.id;
+  }
+
+  Widget _buildProfileHeader(Vendor? vendor) {
+    final businessName = vendor?.businessName ?? 'Your Business';
+    final businessType = vendor?.businessType ?? 'Business Type';
+
+    // Get location from locationData or fallback to form fields or location string
+    String addressDisplay = '';
+
+    if (vendor?.locationData != null) {
+      addressDisplay = vendor!.locationData!.address;
+    } else {
+      addressDisplay = _addressController.text;
+    }
+
+    final ownerName = vendor?.name ?? 'Vendor';
+    final rating = (vendor?.rating ?? 0).toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primary.withValues(alpha: 0.95),
+            AppTheme.primary.withValues(alpha: 0.75),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 14,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                child: Text(
+                  businessName.isNotEmpty ? businessName[0].toUpperCase() : 'V',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      businessName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      ownerName,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$businessType | ${addressDisplay.isNotEmpty ? addressDisplay : "No Address"}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _isEditing = !_isEditing;
+                  });
+                },
+                icon: Icon(
+                  _isEditing ? Icons.close_rounded : Icons.edit_outlined,
+                  color: Colors.white,
+                ),
+                tooltip: _isEditing ? 'Cancel Edit' : 'Edit Profile',
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildHeaderStatTile(
+                  icon: Icons.star_rate_rounded,
+                  label: 'Rating',
+                  value: rating,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildHeaderStatTile(
+                  icon: Icons.verified_user_outlined,
+                  label: 'Status',
+                  value: (vendor?.isActive ?? false) ? 'Active' : 'Inactive',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderStatTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 11,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusinessDetailsCard(Vendor? vendor) {
+    // Get location from locationData or fallback to form fields or location string
+    String addressDisplay = '';
+
+    if (vendor?.locationData != null) {
+      addressDisplay = vendor!.locationData!.address;
+    } else {
+      addressDisplay = _addressController.text;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Business Details',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3436),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildDetailRow(Icons.person_outline, 'Owner', vendor?.name ?? '-'),
+          _buildDetailRow(Icons.email_outlined, 'Email', vendor?.email ?? '-'),
+          _buildDetailRow(
+            Icons.phone_outlined,
+            'Phone',
+            vendor?.phone.isNotEmpty == true ? vendor!.phone : '-',
+          ),
+          _buildDetailRow(
+            Icons.storefront_outlined,
+            'Business Type',
+            vendor?.businessType ?? '-',
+          ),
+          _buildDetailRow(
+            Icons.location_on_outlined,
+            'Location',
+            addressDisplay.isNotEmpty ? addressDisplay : 'No Address',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[700]),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 104,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF2D3436),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -475,7 +768,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'phone': _phoneController.text.trim(),
       'businessName': _businessNameController.text.trim(),
       'businessType': _businessTypeController.text.trim(),
-      'location': _locationController.text.trim(),
+      'location': {
+        'coordinates': [
+          77.2090,
+          28.6139,
+        ], // Default coordinates (can be enhanced with GPS)
+        'address': _addressController.text.trim(),
+        if (_landmarkController.text.trim().isNotEmpty)
+          'landmark': _landmarkController.text.trim(),
+        'city': _cityController.text.trim(),
+        'state': _stateController.text.trim(),
+        'pincode': _pincodeController.text.trim(),
+      },
     };
 
     final success = await vendorProvider.updateProfile(profileData);
@@ -502,6 +806,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _navigateToLogin(BuildContext context) {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Consumer<VendorProvider>(
+        builder: (context, vendorProvider, child) => AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // Close dialog
+                await vendorProvider.logout();
+                if (mounted && context.mounted) {
+                  _navigateToLogin(context);
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Logout'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      // Check location permission
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        // Location services are disabled
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Location services are disabled. Please enable them in device settings.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Location permission denied. Please enable location access.',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Location permission permanently denied. Please enable in app settings.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Text('Getting your location...'),
+              ],
+            ),
+            duration: Duration(seconds: 10),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      // Reverse geocode to get address details
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks.first;
+
+        setState(() {
+          // Only fetch city, state, and pincode - leave address and landmark empty
+          _addressController.text =
+              ''; // Keep address field empty for manual entry
+          _landmarkController.text = ''; // Keep landmark empty for manual entry
+          _cityController.text = place.locality ?? '';
+          _stateController.text = place.administrativeArea ?? '';
+          _pincodeController.text = place.postalCode ?? '';
+
+          // Update backward compatibility location field
+          _locationController.text =
+              '${place.locality ?? ''}, ${place.administrativeArea ?? ''}';
+        });
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location fetched successfully! City, State, and Pincode filled.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to get location: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

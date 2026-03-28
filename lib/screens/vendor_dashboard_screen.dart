@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/vendor_api_service.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_assets.dart';
 import '../widgets/analytics_card.dart';
 import '../widgets/recent_orders_widget.dart';
 import '../widgets/quick_stats_widget.dart';
@@ -22,14 +27,24 @@ class VendorDashboardScreen extends StatefulWidget {
 class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
+  bool _hasUnreadNotifications = false;
   late PageController _pageController;
+  late final List<Widget> _tabs;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  Timer? _notificationPollTimer;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _tabs = const [
+      _OverviewTabHost(),
+      OrdersScreen(),
+      ProductsScreen(),
+      AnalyticsScreen(),
+      ProfileScreen(),
+    ];
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -39,13 +54,55 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     );
 
     _animationController.forward();
+    _loadUnreadNotificationStatus();
+    _notificationPollTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadUnreadNotificationStatus(),
+    );
   }
 
   @override
   void dispose() {
+    _notificationPollTimer?.cancel();
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUnreadNotificationStatus() async {
+    try {
+      final authToken = await AuthService().getAuthToken();
+      if (authToken == null || authToken.isEmpty) {
+        if (mounted && _hasUnreadNotifications) {
+          setState(() {
+            _hasUnreadNotifications = false;
+          });
+        }
+        return;
+      }
+
+      final response = await VendorApiService.getNotifications(authToken);
+      final notifications =
+          (response['data']?['notifications'] as List<dynamic>?) ?? [];
+
+      final hasUnread = notifications.any((raw) {
+        if (raw is! Map) {
+          return false;
+        }
+
+        final status = raw['status']?.toString().toLowerCase() ?? '';
+        final isRead = raw['isRead'] == true || status == 'read';
+        return !isRead;
+      });
+
+      if (mounted && _hasUnreadNotifications != hasUnread) {
+        setState(() {
+          _hasUnreadNotifications = hasUnread;
+        });
+      }
+    } catch (_) {
+      // Keep last known indicator state; avoid noisy UI failures for badge poll.
+    }
   }
 
   @override
@@ -57,18 +114,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         opacity: _fadeAnimation,
         child: PageView(
           controller: _pageController,
+          physics: const NeverScrollableScrollPhysics(),
           onPageChanged: (index) {
             setState(() {
               _currentIndex = index;
             });
           },
-          children: [
-            _buildOverviewTab(context),
-            _buildOrdersTab(context),
-            _buildProductsTab(context),
-            _buildAnalyticsTab(context),
-            _buildProfileTab(context),
-          ],
+          children: _tabs,
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -82,6 +134,10 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       backgroundColor: AppTheme.surface,
       elevation: 0,
       foregroundColor: AppTheme.textPrimary,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: AppLogo(size: 32, withGradient: false, borderRadius: 8.0),
+      ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -105,27 +161,29 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           children: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const NotificationScreen(),
                   ),
                 );
+                await _loadUnreadNotificationStatus();
               },
             ),
-            Positioned(
-              right: 8,
-              top: 8,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary,
-                  shape: BoxShape.circle,
+            if (_hasUnreadNotifications)
+              Positioned(
+                right: 10,
+                top: 10,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.primary,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ],
@@ -146,15 +204,24 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       ),
       child: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) {
+        onTap: (index) async {
+          if (index == _currentIndex) return;
+          final previousIndex = _currentIndex;
           setState(() {
             _currentIndex = index;
           });
-          _pageController.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
+          if (!mounted || !_pageController.hasClients) return;
+
+          final isAdjacent = (index - previousIndex).abs() == 1;
+          if (isAdjacent) {
+            await _pageController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+            );
+          } else {
+            _pageController.jumpToPage(index);
+          }
         },
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.transparent,
@@ -217,11 +284,32 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     }
   }
 
+  Future<void> _goToTab(int index) async {
+    if (index == _currentIndex) return;
+    final previousIndex = _currentIndex;
+    setState(() {
+      _currentIndex = index;
+    });
+    if (!mounted || !_pageController.hasClients) return;
+
+    final isAdjacent = (index - previousIndex).abs() == 1;
+    if (isAdjacent) {
+      await _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _pageController.jumpToPage(index);
+    }
+  }
+
   Widget _buildOverviewTab(BuildContext context) {
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) => RefreshIndicator(
         onRefresh: () async {
           await vendorProvider.refreshData();
+          await _loadUnreadNotificationStatus();
         },
         color: AppTheme.primary,
         backgroundColor: AppTheme.surface,
@@ -244,7 +332,12 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                   const SizedBox(height: 20),
 
                   // Recent Orders
-                  RecentOrdersWidget(vendorProvider: vendorProvider),
+                  RecentOrdersWidget(
+                    vendorProvider: vendorProvider,
+                    onViewAll: () {
+                      _goToTab(1);
+                    },
+                  ),
                   const SizedBox(height: 20),
 
                   // Analytics Cards - Responsive layout
@@ -298,19 +391,17 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     );
   }
 
-  Widget _buildOrdersTab(BuildContext context) {
-    return const OrdersScreen();
-  }
+}
 
-  Widget _buildProductsTab(BuildContext context) {
-    return const ProductsScreen();
-  }
+class _OverviewTabHost extends StatelessWidget {
+  const _OverviewTabHost();
 
-  Widget _buildAnalyticsTab(BuildContext context) {
-    return const AnalyticsScreen();
-  }
-
-  Widget _buildProfileTab(BuildContext context) {
-    return const ProfileScreen();
+  @override
+  Widget build(BuildContext context) {
+    final state = context.findAncestorStateOfType<_VendorDashboardScreenState>();
+    if (state == null) {
+      return const SizedBox.shrink();
+    }
+    return state._buildOverviewTab(context);
   }
 }

@@ -1,8 +1,41 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import '../config/api_endpoints.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
+import '../services/image_upload_service.dart';
+import '../utils/secure_logger.dart';
+
+bool _isLocalFilePath(String path) {
+  final normalized = path.trim().toLowerCase();
+  return normalized.startsWith('/data/') ||
+      normalized.startsWith('/storage/') ||
+      normalized.startsWith('file://') ||
+      RegExp(r'^[a-z]:\\').hasMatch(normalized);
+}
+
+String _imageServerBaseUrl() {
+  final baseUri = Uri.parse(ApiEndpoints.baseUrl);
+  // Use only origin for image URLs (e.g., https://host[:port]).
+  // API base paths like /api/vendor should not be prefixed to /uploads paths.
+  return baseUri.origin;
+}
+
+String _resolveImageUrl(String rawPath) {
+  final path = rawPath.trim();
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+
+  final baseUrl = _imageServerBaseUrl();
+  if (path.startsWith('/')) {
+    return '$baseUrl$path';
+  }
+  return '$baseUrl/$path';
+}
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -14,9 +47,54 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'All';
+  late final VoidCallback _searchListener;
+  static const Map<String, List<String>> _categoryAliases = {
+    'Snacks': ['snacks', 'snack'],
+    'Beverages': ['beverages', 'beverage', 'drinks', 'drink'],
+    'South Indian': ['south indian', 'south_indian', 'south-indian'],
+    'North Indian': ['north indian', 'north_indian', 'north-indian'],
+    'Chinese': ['chinese'],
+    'Desserts': ['desserts', 'dessert', 'sweet', 'sweets'],
+  };
+
+  String _normalizeCategory(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  bool _matchesCategory(
+    String productCategory,
+    String selectedDisplayCategory,
+  ) {
+    final normalizedProductCategory = _normalizeCategory(productCategory);
+    final aliases =
+        _categoryAliases[selectedDisplayCategory]?.map(_normalizeCategory) ??
+        const <String>[];
+    return aliases.contains(normalizedProductCategory);
+  }
+
+  String _normalizeSearch(String value) {
+    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchListener = () {
+      if (mounted) {
+        setState(() {});
+      }
+    };
+    _searchController.addListener(_searchListener);
+  }
 
   @override
   void dispose() {
+    _searchController.removeListener(_searchListener);
     _searchController.dispose();
     super.dispose();
   }
@@ -88,6 +166,33 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Widget build(BuildContext context) {
     return Consumer<VendorProvider>(
       builder: (context, vendorProvider, child) {
+        final searchQuery = _normalizeSearch(_searchController.text);
+        final shouldBypassFilters =
+            searchQuery.isEmpty && _selectedCategory == 'All';
+
+        final filteredProducts = shouldBypassFilters
+            ? vendorProvider.products
+            : vendorProvider.products.where((product) {
+                final name = product.name.toString().toLowerCase();
+                final description = product.description
+                    .toString()
+                    .toLowerCase();
+                final category = product.category.toString();
+                final normalizedCategory = _normalizeCategory(category);
+                final searchableText = _normalizeSearch(
+                  '$name $description $normalizedCategory',
+                );
+
+                final matchesSearch =
+                    searchQuery.isEmpty || searchableText.contains(searchQuery);
+
+                final matchesCategory =
+                    _selectedCategory == 'All' ||
+                    _matchesCategory(category, _selectedCategory);
+
+                return matchesSearch && matchesCategory;
+              }).toList();
+
         return Scaffold(
           backgroundColor: AppTheme.background,
           appBar: AppBar(
@@ -114,6 +219,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       decoration: InputDecoration(
                         hintText: 'Search products...',
                         prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.trim().isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => _searchController.clear(),
+                              )
+                            : null,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -170,7 +281,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           color: AppTheme.primary,
                         ),
                       )
-                    : vendorProvider.products.isEmpty
+                    : filteredProducts.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -182,7 +293,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'No products found',
+                              vendorProvider.products.isNotEmpty
+                                  ? 'No matching products'
+                                  : 'No products found',
                               style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.grey[600],
@@ -191,7 +304,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Tap the + button to add your first product',
+                              vendorProvider.products.isNotEmpty
+                                  ? 'Try clearing search or selecting All category'
+                                  : 'Tap the + button to add your first product',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[500],
@@ -202,15 +317,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: vendorProvider.products.length,
+                        itemCount: filteredProducts.length,
                         itemBuilder: (context, index) {
                           return ProductCard(
-                            product: vendorProvider.products[index],
-                            onEdit: () => _showEditProductDialog(
-                              vendorProvider.products[index],
-                            ),
+                            product: filteredProducts[index],
+                            onEdit: () =>
+                                _showEditProductDialog(filteredProducts[index]),
                             onDelete: () => _showDeleteConfirmDialog(
-                              vendorProvider.products[index],
+                              filteredProducts[index],
                             ),
                           );
                         },
@@ -235,6 +349,28 @@ class ProductCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
   });
+
+  Widget _buildProductImage(String imagePath) {
+    final trimmedPath = imagePath.trim();
+
+    if (_isLocalFilePath(trimmedPath)) {
+      return Image.file(
+        File(trimmedPath.replaceFirst('file://', '')),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Icon(Icons.image_not_supported, color: Colors.grey[400]);
+        },
+      );
+    }
+
+    return Image.network(
+      _resolveImageUrl(trimmedPath),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(Icons.image_not_supported, color: Colors.grey[400]);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -268,15 +404,8 @@ class ProductCard extends StatelessWidget {
                 child: product.images?.isNotEmpty == true
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          product.images[0],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.image_not_supported,
-                              color: Colors.grey[400],
-                            );
-                          },
+                        child: _buildProductImage(
+                          product.images[0]?.toString() ?? '',
                         ),
                       )
                     : Icon(Icons.image_not_supported, color: Colors.grey[400]),
@@ -402,7 +531,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
   String _selectedCategory = 'Snacks';
   bool _isAvailable = true;
   bool _isFeatured = false;
-  List<String> _productImages = [];
+  final List<File> _productImageFiles = [];
+  List<String> _uploadedImageUrls = [];
   final ImagePicker _imagePicker = ImagePicker();
 
   final List<String> _categories = [
@@ -413,6 +543,15 @@ class _AddProductDialogState extends State<AddProductDialog> {
     'Chinese',
     'Desserts',
   ];
+
+  static const Map<String, String> _categoryToApiValue = {
+    'Snacks': 'snacks',
+    'Beverages': 'beverages',
+    'South Indian': 'south indian',
+    'North Indian': 'north indian',
+    'Chinese': 'chinese',
+    'Desserts': 'desserts',
+  };
 
   bool get _isEdit => widget.product != null;
 
@@ -431,10 +570,79 @@ class _AddProductDialogState extends State<AddProductDialog> {
     _priceController.text = product.price?.toString() ?? '';
     _stockController.text = product.stockQuantity?.toString() ?? '';
     _discountController.text = product.discountPercentage?.toString() ?? '';
-    _selectedCategory = product.category ?? 'Snacks';
+    _selectedCategory = _toDisplayCategory(
+      product.category?.toString() ?? 'snacks',
+    );
     _isAvailable = product.isAvailable ?? true;
     _isFeatured = product.isFeatured ?? false;
-    _productImages = List<String>.from(product.images ?? []);
+
+    // Handle existing images - convert URLs to display
+    final existingImages = product.images ?? [];
+    _uploadedImageUrls = List<String>.from(existingImages);
+  }
+
+  String _toApiCategory(String displayCategory) {
+    return _categoryToApiValue[displayCategory] ??
+        displayCategory.toLowerCase();
+  }
+
+  String _toDisplayCategory(String apiCategory) {
+    final normalized = apiCategory.trim().toLowerCase();
+    for (final entry in _categoryToApiValue.entries) {
+      if (entry.value == normalized) {
+        return entry.key;
+      }
+    }
+    return 'Snacks';
+  }
+
+  Widget _buildPreviewImage(dynamic imageSource) {
+    if (imageSource is File) {
+      // Handle local file
+      return Image.file(
+        imageSource,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey[200],
+            child: Icon(Icons.image, color: Colors.grey[400]),
+          );
+        },
+      );
+    } else if (imageSource is String) {
+      // Handle URL string
+      final trimmedPath = imageSource.trim();
+
+      if (_isLocalFilePath(trimmedPath)) {
+        return Image.file(
+          File(trimmedPath.replaceFirst('file://', '')),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[200],
+              child: Icon(Icons.image, color: Colors.grey[400]),
+            );
+          },
+        );
+      }
+
+      return Image.network(
+        _resolveImageUrl(trimmedPath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey[200],
+            child: Icon(Icons.image, color: Colors.grey[400]),
+          );
+        },
+      );
+    }
+
+    // Fallback for unsupported types
+    return Container(
+      color: Colors.grey[200],
+      child: Icon(Icons.image, color: Colors.grey[400]),
+    );
   }
 
   @override
@@ -451,14 +659,31 @@ class _AddProductDialogState extends State<AddProductDialog> {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        imageQuality: 80,
-        maxWidth: 800,
-        maxHeight: 600,
+        imageQuality: 90,
+        maxWidth: 1200,
+        maxHeight: 1200,
       );
 
       if (image != null && mounted) {
+        final imageFile = File(image.path);
+
+        // Validate and optimize the image
+        if (!ImageUploadService.isValidImageFile(imageFile)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Please select a valid image file (JPG, PNG, or WebP)',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
         setState(() {
-          _productImages.add(image.path);
+          _productImageFiles.add(imageFile);
         });
       }
     } catch (e) {
@@ -520,7 +745,15 @@ class _AddProductDialogState extends State<AddProductDialog> {
 
   void _removeImage(int index) {
     setState(() {
-      _productImages.removeAt(index);
+      if (index < _productImageFiles.length) {
+        _productImageFiles.removeAt(index);
+      } else {
+        // Remove from uploaded URLs if index is in that range
+        final urlIndex = index - _productImageFiles.length;
+        if (urlIndex >= 0 && urlIndex < _uploadedImageUrls.length) {
+          _uploadedImageUrls.removeAt(urlIndex);
+        }
+      }
     });
   }
 
@@ -531,56 +764,197 @@ class _AddProductDialogState extends State<AddProductDialog> {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    final productData = {
-      'name': _nameController.text.trim(),
-      'description': _descriptionController.text.trim(),
-      'price': double.parse(_priceController.text),
-      'category': _selectedCategory,
-      'images': _productImages,
-      'isAvailable': _isAvailable,
-      'stockQuantity': int.parse(_stockController.text),
-      'tags': [],
-      'nutritionalInfo': {},
-      'discountPercentage': _discountController.text.isNotEmpty
-          ? double.parse(_discountController.text)
-          : null,
-      'isFeatured': _isFeatured,
-    };
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Expanded(child: Text('Uploading images and saving product...')),
+          ],
+        ),
+      ),
+    );
 
-    bool success;
-    if (_isEdit) {
-      success = await vendorProvider.updateProduct(
-        widget.product.id,
-        productData,
-      );
-    } else {
-      success = await vendorProvider.createProduct(productData);
-    }
-
-    if (success) {
-      navigator.pop();
-      if (mounted) {
+    try {
+      // Validate that at least one image is provided
+      if (_productImageFiles.isEmpty && _uploadedImageUrls.isEmpty) {
+        navigator.pop(); // Close loading dialog
         scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              _isEdit
-                  ? 'Product updated successfully!'
-                  : 'Product added successfully!',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } else {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              vendorProvider.error ??
-                  'Failed to ${_isEdit ? 'update' : 'add'} product',
-            ),
+          const SnackBar(
+            content: Text('At least one image is required'),
             backgroundColor: Colors.red,
           ),
+        );
+        return;
+      }
+
+      final stockQuantity = int.tryParse(_stockController.text.trim()) ?? 0;
+      final normalizedCategory = _toApiCategory(_selectedCategory);
+      bool success;
+      if (_isEdit) {
+        // Edit flow keeps URL-based image handling.
+        List<String> allImageUrls = List.from(_uploadedImageUrls);
+        SecureLogger.info(
+          'Starting image upload. Product images: ${_productImageFiles.length}, Uploaded URLs: ${_uploadedImageUrls.length}',
+        );
+        SecureLogger.info('Base URL: ${ApiEndpoints.baseUrl}');
+        SecureLogger.info('Endpoint: ${ApiEndpoints.uploadProductImages}');
+
+        if (_productImageFiles.isNotEmpty) {
+          final authToken = vendorProvider.authToken;
+          if (authToken == null) {
+            throw Exception('Not authenticated');
+          }
+
+          final uploadResults = await ImageUploadService.uploadImages(
+            _productImageFiles,
+            authToken: authToken,
+            baseUrl: ApiEndpoints.baseUrl,
+            endpoint: ApiEndpoints.uploadProductImages,
+          );
+
+          SecureLogger.info(
+            'Upload results: ${uploadResults.length} items processed',
+          );
+
+          for (final result in uploadResults) {
+            if (result.success && result.imageUrl != null) {
+              allImageUrls.add(result.imageUrl!);
+              SecureLogger.info(
+                'Successfully uploaded image: ${result.imageUrl}',
+              );
+            } else {
+              SecureLogger.warning('Failed to upload image: ${result.error}');
+            }
+          }
+
+          final failedUploads = uploadResults.where((r) => !r.success).toList();
+          if (failedUploads.isNotEmpty) {
+            scaffoldMessenger.showSnackBar(
+              SnackBar(
+                content: Text('${failedUploads.length} images failed to upload'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+
+          if (allImageUrls.isEmpty && _uploadedImageUrls.isEmpty) {
+            navigator.pop(); // Close loading dialog
+            final firstError = failedUploads.isNotEmpty
+                ? (failedUploads.first.error ?? 'Upload failed')
+                : 'Upload failed';
+            scaffoldMessenger.showSnackBar(
+              SnackBar(
+                content: Text('Image upload failed: $firstError'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+        }
+
+        if (allImageUrls.isEmpty) {
+          navigator.pop(); // Close loading dialog
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'At least one uploaded image URL is required to save product',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        final productData = {
+          'name': _nameController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'price': double.parse(_priceController.text),
+          'category': normalizedCategory,
+          'images': allImageUrls,
+          'isAvailable': _isAvailable,
+          'stockQuantity': stockQuantity,
+          'inStock': stockQuantity,
+          'tags': [],
+          'nutritionalInfo': {},
+          'discountPercentage': _discountController.text.isNotEmpty
+              ? double.parse(_discountController.text)
+              : null,
+          'isFeatured': _isFeatured,
+        };
+
+        success = await vendorProvider.updateProduct(
+          widget.product.id,
+          productData,
+        );
+      } else {
+        // Create flow now posts multipart directly to /products with `images` files.
+        final productData = {
+          'name': _nameController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'price': double.parse(_priceController.text),
+          'category': normalizedCategory,
+          'isAvailable': _isAvailable,
+          'stockQuantity': stockQuantity,
+          'inStock': stockQuantity,
+          'tags': [],
+          'nutritionalInfo': {},
+          'discountPercentage': _discountController.text.isNotEmpty
+              ? double.parse(_discountController.text)
+              : null,
+          'isFeatured': _isFeatured,
+        };
+
+        success = await vendorProvider.createProduct(
+          productData,
+          imageFiles: _productImageFiles,
+        );
+      }
+
+      // Close loading dialog
+      navigator.pop();
+
+      if (success) {
+        navigator.pop();
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                _isEdit
+                    ? 'Product updated successfully!'
+                    : 'Product added successfully!',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                vendorProvider.error ??
+                    'Failed to ${_isEdit ? 'update' : 'add'} product',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -736,12 +1110,13 @@ class _AddProductDialogState extends State<AddProductDialog> {
                               _stockController,
                               Icons.inventory_outlined,
                               keyboardType: TextInputType.number,
+                              hintText: 'Optional',
                               validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Required';
+                                if (value == null || value.trim().isEmpty) {
+                                  return null;
                                 }
-                                if (int.tryParse(value) == null ||
-                                    int.parse(value) < 0) {
+                                if (int.tryParse(value.trim()) == null ||
+                                    int.parse(value.trim()) < 0) {
                                   return 'Invalid stock';
                                 }
                                 return null;
@@ -1034,9 +1409,13 @@ class _AddProductDialogState extends State<AddProductDialog> {
           height: 100,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: _productImages.length + 1,
+            itemCount:
+                _productImageFiles.length + _uploadedImageUrls.length + 1,
             itemBuilder: (context, index) {
-              if (index == _productImages.length) {
+              final totalImages =
+                  _productImageFiles.length + _uploadedImageUrls.length;
+
+              if (index == totalImages) {
                 // Add Image Button
                 return Container(
                   width: 100,
@@ -1072,6 +1451,14 @@ class _AddProductDialogState extends State<AddProductDialog> {
                 );
               } else {
                 // Image Preview
+                dynamic imageSource;
+                if (index < _productImageFiles.length) {
+                  imageSource = _productImageFiles[index];
+                } else {
+                  imageSource =
+                      _uploadedImageUrls[index - _productImageFiles.length];
+                }
+
                 return Container(
                   width: 100,
                   margin: const EdgeInsets.only(right: 12),
@@ -1084,19 +1471,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            _productImages[index],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[200],
-                                child: Icon(
-                                  Icons.image,
-                                  color: Colors.grey[400],
-                                ),
-                              );
-                            },
-                          ),
+                          child: _buildPreviewImage(imageSource),
                         ),
                       ),
                       Positioned(
