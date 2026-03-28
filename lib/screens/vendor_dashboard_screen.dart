@@ -28,23 +28,19 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
   bool _hasUnreadNotifications = false;
+  bool _isFetchingNotificationStatus = false;
+  DateTime? _lastNotificationFetchAt;
   late PageController _pageController;
-  late final List<Widget> _tabs;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   Timer? _notificationPollTimer;
+  static const Duration _notificationPollInterval = Duration(seconds: 60);
+  static const Duration _notificationMinFetchGap = Duration(seconds: 45);
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
-    _tabs = const [
-      _OverviewTabHost(),
-      OrdersScreen(),
-      ProductsScreen(),
-      AnalyticsScreen(),
-      ProfileScreen(),
-    ];
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -54,9 +50,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     );
 
     _animationController.forward();
-    _loadUnreadNotificationStatus();
+    _loadUnreadNotificationStatus(force: true);
     _notificationPollTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      _notificationPollInterval,
       (_) => _loadUnreadNotificationStatus(),
     );
   }
@@ -69,7 +65,19 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     super.dispose();
   }
 
-  Future<void> _loadUnreadNotificationStatus() async {
+  Future<void> _loadUnreadNotificationStatus({bool force = false}) async {
+    if (_isFetchingNotificationStatus) {
+      return;
+    }
+
+    if (!force && _lastNotificationFetchAt != null) {
+      final elapsed = DateTime.now().difference(_lastNotificationFetchAt!);
+      if (elapsed < _notificationMinFetchGap) {
+        return;
+      }
+    }
+
+    _isFetchingNotificationStatus = true;
     try {
       final authToken = await AuthService().getAuthToken();
       if (authToken == null || authToken.isEmpty) {
@@ -82,6 +90,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       }
 
       final response = await VendorApiService.getNotifications(authToken);
+      _lastNotificationFetchAt = DateTime.now();
       final notifications =
           (response['data']?['notifications'] as List<dynamic>?) ?? [];
 
@@ -102,6 +111,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       }
     } catch (_) {
       // Keep last known indicator state; avoid noisy UI failures for badge poll.
+    } finally {
+      _isFetchingNotificationStatus = false;
     }
   }
 
@@ -112,19 +123,37 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       appBar: _buildAppBar(context),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: PageView(
+        child: PageView.builder(
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
+          itemCount: 5,
+          itemBuilder: (context, index) => _buildTab(index),
           onPageChanged: (index) {
             setState(() {
               _currentIndex = index;
             });
           },
-          children: _tabs,
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
+  }
+
+  Widget _buildTab(int index) {
+    switch (index) {
+      case 0:
+        return const _OverviewTabHost();
+      case 1:
+        return const OrdersScreen();
+      case 2:
+        return const ProductsScreen();
+      case 3:
+        return const AnalyticsScreen();
+      case 4:
+        return const ProfileScreen();
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
@@ -168,7 +197,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                     builder: (context) => const NotificationScreen(),
                   ),
                 );
-                await _loadUnreadNotificationStatus();
+                await _loadUnreadNotificationStatus(force: true);
               },
             ),
             if (_hasUnreadNotifications)
@@ -309,7 +338,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       builder: (context, vendorProvider, child) => RefreshIndicator(
         onRefresh: () async {
           await vendorProvider.refreshData();
-          await _loadUnreadNotificationStatus();
+          await _loadUnreadNotificationStatus(force: true);
         },
         color: AppTheme.primary,
         backgroundColor: AppTheme.surface,

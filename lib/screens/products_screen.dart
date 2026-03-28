@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -48,6 +49,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'All';
   late final VoidCallback _searchListener;
+  Timer? _searchDebounce;
   static const Map<String, List<String>> _categoryAliases = {
     'Snacks': ['snacks', 'snack'],
     'Beverages': ['beverages', 'beverage', 'drinks', 'drink'],
@@ -85,15 +87,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void initState() {
     super.initState();
     _searchListener = () {
-      if (mounted) {
-        setState(() {});
-      }
+      _searchDebounce?.cancel();
+      _searchDebounce = Timer(const Duration(milliseconds: 180), () {
+        if (mounted) {
+          setState(() {});
+        }
+      });
     };
     _searchController.addListener(_searchListener);
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.removeListener(_searchListener);
     _searchController.dispose();
     super.dispose();
@@ -366,6 +372,9 @@ class ProductCard extends StatelessWidget {
     return Image.network(
       _resolveImageUrl(trimmedPath),
       fit: BoxFit.cover,
+      filterQuality: FilterQuality.low,
+      cacheWidth: 240,
+      cacheHeight: 240,
       errorBuilder: (context, error, stackTrace) {
         return Icon(Icons.image_not_supported, color: Colors.grey[400]);
       },
@@ -629,6 +638,9 @@ class _AddProductDialogState extends State<AddProductDialog> {
       return Image.network(
         _resolveImageUrl(trimmedPath),
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
+        cacheWidth: 320,
+        cacheHeight: 320,
         errorBuilder: (context, error, stackTrace) {
           return Container(
             color: Colors.grey[200],

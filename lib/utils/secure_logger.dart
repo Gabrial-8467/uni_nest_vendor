@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 class SecureLogger {
+  static const int _maxPayloadLogChars = 800;
   static const List<String> _sensitiveKeywords = [
     'token',
     'password',
@@ -69,7 +70,7 @@ class SecureLogger {
 
     if (body != null && kDebugMode) {
       final sanitizedBody = _sanitizeMap(body);
-      debugPrint('Body: $sanitizedBody');
+      debugPrint('Body: ${_truncateForLog(sanitizedBody.toString())}');
     }
   }
 
@@ -82,8 +83,13 @@ class SecureLogger {
 
     if (body != null && kDebugMode) {
       final sanitizedBody = _sanitizeResponse(body);
-      debugPrint('Response: $sanitizedBody');
+      debugPrint('Response: ${_truncateForLog(sanitizedBody)}');
     }
+  }
+
+  static String _truncateForLog(String value) {
+    if (value.length <= _maxPayloadLogChars) return value;
+    return '${value.substring(0, _maxPayloadLogChars)}... [truncated ${value.length - _maxPayloadLogChars} chars]';
   }
 
   // Sanitize URL to remove sensitive query parameters
