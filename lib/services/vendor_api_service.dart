@@ -490,7 +490,18 @@ class VendorApiService {
       authTokenOverride: authToken,
     );
 
-    return Product.fromJson(response['data']);
+    final payload = response['data'];
+    final productJson = payload is Map<String, dynamic>
+        ? payload
+        : Map<String, dynamic>.from(response);
+    final updatedProduct = Product.fromJson(productJson);
+
+    SecureLogger.info(
+      'PUT ${ApiEndpoints.productById(productId)} response images: ${updatedProduct.images}',
+      tag: 'PRODUCTS',
+    );
+
+    return updatedProduct;
   }
 
   static Future<bool> deleteProduct(String productId, String authToken) async {

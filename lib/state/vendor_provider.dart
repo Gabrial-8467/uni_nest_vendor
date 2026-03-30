@@ -594,6 +594,8 @@ class VendorProvider extends ChangeNotifier {
         'Product updated: ${updatedProduct.name}',
         tag: 'PRODUCTS',
       );
+
+      await loadProducts();
       return true;
     } catch (e) {
       _error = 'Failed to update product: ${e.toString()}';

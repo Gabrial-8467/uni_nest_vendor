@@ -8,71 +8,22 @@ import '../config/api_endpoints.dart';
 import '../config/vendor_config.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/product_image_helper.dart';
 import '../services/image_upload_service.dart';
 import '../utils/secure_logger.dart';
 
-bool _isLocalFilePath(String path) {
-  final normalized = path.trim().toLowerCase();
-  return normalized.startsWith('/data/') ||
-      normalized.startsWith('/storage/') ||
-      normalized.startsWith('file://') ||
-      RegExp(r'^[a-z]:\\').hasMatch(normalized);
-}
+bool _isLocalFilePath(String path) => ProductImageHelper.isLocalFilePath(path);
 
-String _imageServerBaseUrl() {
-  final baseUri = Uri.parse(VendorConfig.apiBaseUrl);
-  // Use only origin for image URLs (e.g., https://host[:port]).
-  // API base paths like /api/vendor should not be prefixed to /uploads paths.
-  return baseUri.origin;
-}
+String _normalizeImagePath(String rawPath) =>
+    ProductImageHelper.normalizeImagePath(rawPath);
 
-bool _isLoopbackHost(String host) {
-  final normalized = host.trim().toLowerCase();
-  return normalized == 'localhost' ||
-      normalized == '127.0.0.1' ||
-      normalized == '::1';
-}
-
-String _normalizeImagePath(String rawPath) {
-  return rawPath
-      .trim()
-      .replaceAll('\\', '/')
-      .replaceAll('"', '')
-      .replaceAll("'", '');
-}
-
-String _resolveImageUrl(String rawPath) {
-  final path = _normalizeImagePath(rawPath);
-  if (path.isEmpty) {
-    return '';
-  }
-
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    final uri = Uri.tryParse(path);
-    if (uri != null && _isLoopbackHost(uri.host)) {
-      final reachableBaseUri = Uri.parse(VendorConfig.apiBaseUrl);
-      return uri
-          .replace(
-            scheme: reachableBaseUri.scheme,
-            host: reachableBaseUri.host,
-            port: reachableBaseUri.hasPort ? reachableBaseUri.port : null,
-          )
-          .toString();
-    }
-    return path;
-  }
-
-  final baseUrl = _imageServerBaseUrl();
-  if (path.startsWith('//')) {
-    return '${Uri.parse(baseUrl).scheme}:$path';
-  }
-
-  if (path.startsWith('/')) {
-    return '$baseUrl$path';
-  }
-
-  return '$baseUrl/$path';
-}
+String _resolveImageUrl(String rawPath, {String? cacheBustKey}) =>
+    ProductImageHelper.safeRenderUrl(
+      rawPath,
+      apiBaseUrl: VendorConfig.apiBaseUrl,
+      cacheBustKey: cacheBustKey,
+    ) ??
+    '';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -442,7 +393,7 @@ class ProductCard extends StatelessWidget {
     return null;
   }
 
-  Widget _buildProductImage(String imagePath) {
+  Widget _buildProductImage(String imagePath, {String? cacheBustKey}) {
     final trimmedPath = _normalizeImagePath(imagePath);
 
     if (_isLocalFilePath(trimmedPath)) {
@@ -455,7 +406,10 @@ class ProductCard extends StatelessWidget {
       );
     }
 
-    final resolvedUrl = _resolveImageUrl(trimmedPath);
+    final resolvedUrl = _resolveImageUrl(
+      trimmedPath,
+      cacheBustKey: cacheBustKey,
+    );
     if (resolvedUrl.isEmpty) {
       return Icon(Icons.image_not_supported, color: Colors.grey[400]);
     }
@@ -506,7 +460,14 @@ class ProductCard extends StatelessWidget {
                 child: primaryImagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: _buildProductImage(primaryImagePath),
+                        child: _buildProductImage(
+                          primaryImagePath,
+                          cacheBustKey:
+                              product.updatedAt?.millisecondsSinceEpoch
+                                  .toString() ??
+                              product.createdAt.millisecondsSinceEpoch
+                                  .toString(),
+                        ),
                       )
                     : Icon(Icons.image_not_supported, color: Colors.grey[400]),
               ),
@@ -634,6 +595,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
   final List<File> _productImageFiles = [];
   List<String> _uploadedImageUrls = [];
   final ImagePicker _imagePicker = ImagePicker();
+  late String _imageCacheBustKey;
 
   final List<String> _categories = [
     'Snacks',
@@ -658,6 +620,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
   @override
   void initState() {
     super.initState();
+    _imageCacheBustKey = DateTime.now().millisecondsSinceEpoch.toString();
     if (_isEdit) {
       _populateFields();
     }
@@ -726,7 +689,10 @@ class _AddProductDialogState extends State<AddProductDialog> {
         );
       }
 
-      final resolvedUrl = _resolveImageUrl(trimmedPath);
+      final resolvedUrl = _resolveImageUrl(
+        trimmedPath,
+        cacheBustKey: _imageCacheBustKey,
+      );
       if (resolvedUrl.isEmpty) {
         return Container(
           color: Colors.grey[200],
@@ -921,7 +887,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
       if (_isEdit) {
         // Edit flow keeps URL-based image handling.
         final existingImageUrls = _normalizeImageUrls(_uploadedImageUrls);
-        final allImageUrls = List<String>.from(existingImageUrls);
+        final newlyUploadedImageUrls = <String>[];
         SecureLogger.info(
           'Starting image upload. Product images: ${_productImageFiles.length}, Uploaded URLs: ${_uploadedImageUrls.length}',
         );
@@ -953,8 +919,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
             if (result.success && result.imageUrl != null) {
               final newImageUrl = result.imageUrl!.trim();
               if (newImageUrl.isNotEmpty &&
-                  !allImageUrls.contains(newImageUrl)) {
-                allImageUrls.add(newImageUrl);
+                  !newlyUploadedImageUrls.contains(newImageUrl)) {
+                newlyUploadedImageUrls.add(newImageUrl);
               }
               SecureLogger.info(
                 'Successfully uploaded image: ${result.imageUrl}',
@@ -975,7 +941,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
             );
           }
 
-          if (allImageUrls.isEmpty && _uploadedImageUrls.isEmpty) {
+          if (newlyUploadedImageUrls.isEmpty && _uploadedImageUrls.isEmpty) {
             navigator.pop(); // Close loading dialog
             final firstError = failedUploads.isNotEmpty
                 ? (failedUploads.first.error ?? 'Upload failed')
@@ -990,7 +956,10 @@ class _AddProductDialogState extends State<AddProductDialog> {
           }
         }
 
-        final finalImageUrls = _normalizeImageUrls(allImageUrls);
+        final finalImageUrls = _normalizeImageUrls([
+          ...newlyUploadedImageUrls,
+          ...existingImageUrls,
+        ]);
         if (finalImageUrls.isEmpty) {
           navigator.pop(); // Close loading dialog
           scaffoldMessenger.showSnackBar(
@@ -1018,6 +987,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
           'description': _descriptionController.text.trim(),
           'price': double.parse(_priceController.text),
           'category': normalizedCategory,
+          'image': finalImageUrls.first,
           'images': finalImageUrls,
           'isAvailable': _isAvailable,
           'stockQuantity': stockQuantity,
@@ -1062,6 +1032,9 @@ class _AddProductDialogState extends State<AddProductDialog> {
       navigator.pop();
 
       if (success) {
+        setState(() {
+          _imageCacheBustKey = DateTime.now().millisecondsSinceEpoch.toString();
+        });
         navigator.pop();
         if (mounted) {
           scaffoldMessenger.showSnackBar(
