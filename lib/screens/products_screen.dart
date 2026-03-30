@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../config/api_endpoints.dart';
+import '../config/vendor_config.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 import '../services/image_upload_service.dart';
@@ -19,22 +20,57 @@ bool _isLocalFilePath(String path) {
 }
 
 String _imageServerBaseUrl() {
-  final baseUri = Uri.parse(ApiEndpoints.baseUrl);
+  final baseUri = Uri.parse(VendorConfig.apiBaseUrl);
   // Use only origin for image URLs (e.g., https://host[:port]).
   // API base paths like /api/vendor should not be prefixed to /uploads paths.
   return baseUri.origin;
 }
 
+bool _isLoopbackHost(String host) {
+  final normalized = host.trim().toLowerCase();
+  return normalized == 'localhost' ||
+      normalized == '127.0.0.1' ||
+      normalized == '::1';
+}
+
+String _normalizeImagePath(String rawPath) {
+  return rawPath
+      .trim()
+      .replaceAll('\\', '/')
+      .replaceAll('"', '')
+      .replaceAll("'", '');
+}
+
 String _resolveImageUrl(String rawPath) {
-  final path = rawPath.trim();
+  final path = _normalizeImagePath(rawPath);
+  if (path.isEmpty) {
+    return '';
+  }
+
   if (path.startsWith('http://') || path.startsWith('https://')) {
+    final uri = Uri.tryParse(path);
+    if (uri != null && _isLoopbackHost(uri.host)) {
+      final reachableBaseUri = Uri.parse(VendorConfig.apiBaseUrl);
+      return uri
+          .replace(
+            scheme: reachableBaseUri.scheme,
+            host: reachableBaseUri.host,
+            port: reachableBaseUri.hasPort ? reachableBaseUri.port : null,
+          )
+          .toString();
+    }
     return path;
   }
 
   final baseUrl = _imageServerBaseUrl();
+  if (path.startsWith('//')) {
+    return '${Uri.parse(baseUrl).scheme}:$path';
+  }
+
   if (path.startsWith('/')) {
     return '$baseUrl$path';
   }
+
   return '$baseUrl/$path';
 }
 
@@ -356,8 +392,58 @@ class ProductCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  String? _extractImageValue(dynamic value) {
+    if (value == null) return null;
+
+    if (value is String) {
+      final normalized = _normalizeImagePath(value);
+      return normalized.isEmpty ? null : normalized;
+    }
+
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      return _extractImageValue(
+        map['url'] ??
+            map['secure_url'] ??
+            map['location'] ??
+            map['imageUrl'] ??
+            map['assetUrl'] ??
+            map['image'] ??
+            map['thumbnail'] ??
+            map['path'] ??
+            map['src'],
+      );
+    }
+
+    return null;
+  }
+
+  String? _primaryImagePath() {
+    dynamic images;
+    try {
+      images = product.images;
+    } catch (_) {
+      images = product is Map ? product['images'] : null;
+    }
+
+    if (images is List && images.isNotEmpty) {
+      for (final image in images) {
+        final resolved = _extractImageValue(image);
+        if (resolved != null) return resolved;
+      }
+    }
+
+    if (product is Map) {
+      return _extractImageValue(
+        product['image'] ?? product['imageUrl'] ?? product['thumbnail'],
+      );
+    }
+
+    return null;
+  }
+
   Widget _buildProductImage(String imagePath) {
-    final trimmedPath = imagePath.trim();
+    final trimmedPath = _normalizeImagePath(imagePath);
 
     if (_isLocalFilePath(trimmedPath)) {
       return Image.file(
@@ -369,8 +455,13 @@ class ProductCard extends StatelessWidget {
       );
     }
 
+    final resolvedUrl = _resolveImageUrl(trimmedPath);
+    if (resolvedUrl.isEmpty) {
+      return Icon(Icons.image_not_supported, color: Colors.grey[400]);
+    }
+
     return Image.network(
-      _resolveImageUrl(trimmedPath),
+      resolvedUrl,
       fit: BoxFit.cover,
       filterQuality: FilterQuality.low,
       cacheWidth: 240,
@@ -383,6 +474,8 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primaryImagePath = _primaryImagePath();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -410,12 +503,10 @@ class ProductCard extends StatelessWidget {
                   color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: product.images?.isNotEmpty == true
+                child: primaryImagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: _buildProductImage(
-                          product.images[0]?.toString() ?? '',
-                        ),
+                        child: _buildProductImage(primaryImagePath),
                       )
                     : Icon(Icons.image_not_supported, color: Colors.grey[400]),
               ),
@@ -620,7 +711,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
       );
     } else if (imageSource is String) {
       // Handle URL string
-      final trimmedPath = imageSource.trim();
+      final trimmedPath = _normalizeImagePath(imageSource);
 
       if (_isLocalFilePath(trimmedPath)) {
         return Image.file(
@@ -635,8 +726,16 @@ class _AddProductDialogState extends State<AddProductDialog> {
         );
       }
 
+      final resolvedUrl = _resolveImageUrl(trimmedPath);
+      if (resolvedUrl.isEmpty) {
+        return Container(
+          color: Colors.grey[200],
+          child: Icon(Icons.image, color: Colors.grey[400]),
+        );
+      }
+
       return Image.network(
-        _resolveImageUrl(trimmedPath),
+        resolvedUrl,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.low,
         cacheWidth: 320,

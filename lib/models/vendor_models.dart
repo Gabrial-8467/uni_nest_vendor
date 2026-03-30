@@ -216,31 +216,128 @@ class Product {
     this.isFeatured = false,
   });
 
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static String _readString(dynamic value) {
+    if (value == null) return '';
+    final text = value.toString().trim();
+    return text;
+  }
+
+  static String? _extractImageString(dynamic value) {
+    if (value == null) return null;
+
+    if (value is String) {
+      final text = value.trim();
+      return text.isEmpty ? null : text;
+    }
+
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      final candidates = [
+        map['url'],
+        map['secure_url'],
+        map['location'],
+        map['imageUrl'],
+        map['assetUrl'],
+        map['uploadedImageUrl'],
+        map['image'],
+        map['path'],
+        map['src'],
+      ];
+
+      for (final candidate in candidates) {
+        final resolved = _extractImageString(candidate);
+        if (resolved != null && resolved.isNotEmpty) {
+          return resolved;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  static List<String> _extractImages(Map<String, dynamic> json) {
+    final rawImages =
+        json['images'] ??
+        json['imageUrls'] ??
+        json['uploadedImages'] ??
+        json['productImages'] ??
+        json['photos'] ??
+        json['gallery'] ??
+        json['media'];
+
+    if (rawImages is List) {
+      return rawImages
+          .map(_extractImageString)
+          .whereType<String>()
+          .toList();
+    }
+
+    if (rawImages is Map) {
+      final map = Map<String, dynamic>.from(rawImages);
+      final nestedImages =
+          map['images'] ?? map['items'] ?? map['files'] ?? map['data'];
+      if (nestedImages is List) {
+        return nestedImages
+            .map(_extractImageString)
+            .whereType<String>()
+            .toList();
+      }
+    }
+
+    final singleImage = _extractImageString(
+      json['image'] ??
+          json['imageUrl'] ??
+          json['thumbnail'] ??
+          json['featuredImage'] ??
+          json['coverImage'] ??
+          rawImages,
+    );
+
+    return singleImage == null ? <String>[] : <String>[singleImage];
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) {
-    final rawStock = json['stockQuantity'] ?? json['inStock'] ?? 0;
-    final stockValue = rawStock is int
-        ? rawStock
-        : int.tryParse(rawStock.toString()) ?? 0;
+    final rawVendor = json['vendorId'] ?? json['vendor'];
+    final vendorId = rawVendor is Map
+        ? _readString(rawVendor['id'] ?? rawVendor['_id'])
+        : _readString(rawVendor);
 
     return Product(
-      id: json['id'] ?? '',
-      vendorId: json['vendorId'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      price: (json['price'] ?? 0.0).toDouble(),
-      category: json['category'] ?? '',
-      images: List<String>.from(json['images'] ?? []),
+      id: _readString(json['id'] ?? json['_id']),
+      vendorId: vendorId,
+      name: _readString(json['name']),
+      description: _readString(json['description']),
+      price: _toDouble(json['price']),
+      category: _readString(json['category']),
+      images: _extractImages(json),
       isAvailable: json['isAvailable'] ?? true,
-      stockQuantity: stockValue,
-      tags: List<String>.from(json['tags'] ?? []),
-      nutritionalInfo: json['nutritionalInfo'] ?? {},
+      stockQuantity: _toInt(json['stockQuantity'] ?? json['inStock']),
+      tags: List<String>.from((json['tags'] as List?) ?? const []),
+      nutritionalInfo: json['nutritionalInfo'] is Map
+          ? Map<String, dynamic>.from(json['nutritionalInfo'])
+          : {},
       createdAt: DateTime.parse(
         json['createdAt'] ?? DateTime.now().toIso8601String(),
       ),
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : null,
-      discountPercentage: json['discountPercentage']?.toDouble(),
+      discountPercentage: json['discountPercentage'] != null
+          ? _toDouble(json['discountPercentage'])
+          : null,
       isFeatured: json['isFeatured'] ?? false,
     );
   }
