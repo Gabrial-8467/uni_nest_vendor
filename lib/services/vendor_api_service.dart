@@ -468,40 +468,150 @@ class VendorApiService {
   static Future<Product> updateProduct(
     String productId,
     Map<String, dynamic> productData,
-    String authToken,
-  ) async {
-    final images = productData['images'];
-    if (images is List) {
-      SecureLogger.info(
-        'PUT ${ApiEndpoints.productById(productId)} images payload (${images.length}): $images',
-        tag: 'PRODUCTS',
-      );
-    } else {
-      SecureLogger.warning(
-        'PUT ${ApiEndpoints.productById(productId)} missing valid images array. Found: ${images.runtimeType}',
-        tag: 'PRODUCTS',
-      );
-    }
-
-    final response = await _makeRequest(
-      ApiMethods.put,
-      ApiEndpoints.productById(productId),
-      body: productData,
-      authTokenOverride: authToken,
+    String authToken, {
+    List<File>? imageFiles,
+  }) async {
+    final uri = Uri.parse(
+      '${_apiClient._baseUrl}${ApiEndpoints.productById(productId)}',
     );
 
-    final payload = response['data'];
-    final productJson = payload is Map<String, dynamic>
-        ? payload
-        : Map<String, dynamic>.from(response);
-    final updatedProduct = Product.fromJson(productJson);
-
+    // DEBUG: Print request details
+    SecureLogger.info('=== UPDATE PRODUCT DEBUG ===', tag: 'PRODUCTS');
+    SecureLogger.info('URL: $uri', tag: 'PRODUCTS');
+    SecureLogger.info('Method: PUT', tag: 'PRODUCTS');
     SecureLogger.info(
-      'PUT ${ApiEndpoints.productById(productId)} response images: ${updatedProduct.images}',
+      'Image files count: ${imageFiles?.length ?? 0}',
       tag: 'PRODUCTS',
     );
 
-    return updatedProduct;
+    // Check if we have files to upload - use multipart
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      final request = http.MultipartRequest('PUT', uri);
+
+      // Set headers correctly - NO Content-Type override for multipart
+      request.headers['Authorization'] = 'Bearer $authToken';
+      request.headers['Accept'] = 'application/json';
+
+      // Add all non-null fields as strings (per backend contract)
+      productData.forEach((key, value) {
+        if (value != null) {
+          if (value is List || value is Map) {
+            request.fields[key] = jsonEncode(value);
+          } else {
+            request.fields[key] = value.toString();
+          }
+          SecureLogger.info(
+            'Field: $key = ${value.toString()}',
+            tag: 'PRODUCTS',
+          );
+        }
+      });
+
+      // Attach files with EXACT field name 'images'
+      for (int i = 0; i < imageFiles.length; i++) {
+        final file = imageFiles[i];
+        final fileSize = await file.length();
+        final fileNumber = i + 1;
+        SecureLogger.info(
+          'Attaching file $fileNumber: ${file.path} ($fileSize bytes)',
+          tag: 'PRODUCTS',
+        );
+
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'images', // EXACT field name required by backend
+            file.path,
+          ),
+        );
+      }
+
+      // DEBUG: Print final request details
+      SecureLogger.info('Request headers: ${request.headers}', tag: 'PRODUCTS');
+      SecureLogger.info(
+        'Request fields count: ${request.fields.length}',
+        tag: 'PRODUCTS',
+      );
+      SecureLogger.info(
+        'Request files count: ${request.files.length}',
+        tag: 'PRODUCTS',
+      );
+      SecureLogger.info(
+        'Request file field names: ${request.files.map((f) => f.field).toList()}',
+        tag: 'PRODUCTS',
+      );
+
+      try {
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+
+        // DEBUG: Print response details
+        SecureLogger.info(
+          'Response status: ${response.statusCode}',
+          tag: 'PRODUCTS',
+        );
+        SecureLogger.info('Response body: ${response.body}', tag: 'PRODUCTS');
+
+        final data = _apiClient._decodeResponseBody(response.body);
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final payload = data['data'];
+          final productJson = payload is Map<String, dynamic>
+              ? payload
+              : Map<String, dynamic>.from(data);
+          final updatedProduct = Product.fromJson(productJson);
+
+          SecureLogger.info(
+            '✅ Product updated successfully with ${imageFiles.length} images',
+            tag: 'PRODUCTS',
+          );
+          SecureLogger.info(
+            'Updated product images: ${updatedProduct.images}',
+            tag: 'PRODUCTS',
+          );
+
+          return updatedProduct;
+        }
+
+        throw VendorApiException(
+          message: data['message']?.toString() ?? 'Product update failed',
+          statusCode: response.statusCode,
+          errorData: data,
+        );
+      } catch (e) {
+        SecureLogger.error(
+          'Multipart product update failed',
+          error: e,
+          tag: 'PRODUCTS',
+        );
+        rethrow;
+      }
+    } else {
+      // Fallback to regular JSON update if no files
+      SecureLogger.info(
+        'No files provided, using JSON update',
+        tag: 'PRODUCTS',
+      );
+
+      final response = await _makeRequest(
+        ApiMethods.put,
+        ApiEndpoints.productById(productId),
+        body: productData,
+        authTokenOverride: authToken,
+      );
+
+      final payload = response['data'];
+      final productJson = payload is Map<String, dynamic>
+          ? payload
+          : Map<String, dynamic>.from(response);
+      final updatedProduct = Product.fromJson(productJson);
+
+      SecureLogger.info(
+        '✅ Product updated successfully (JSON only)',
+        tag: 'PRODUCTS',
+      );
+
+      return updatedProduct;
+    }
   }
 
   static Future<bool> deleteProduct(String productId, String authToken) async {
@@ -672,7 +782,9 @@ class VendorApiService {
     }
 
     final queryString = Uri(queryParameters: queryParams).query;
-    final endpoint = queryString.isEmpty ? '/earnings' : '/earnings?$queryString';
+    final endpoint = queryString.isEmpty
+        ? '/earnings'
+        : '/earnings?$queryString';
 
     try {
       final response = await _makeRequest(ApiMethods.get, endpoint);
@@ -839,22 +951,26 @@ class VendorApiService {
   }
 
   static Future<Map<String, dynamic>> getVendorSettings(String authToken) {
-    return _makeRequest(ApiMethods.get, '/settings').then((response) {
-      final rawData = response['data'];
-      if (rawData is Map<String, dynamic>) {
-        return rawData;
-      }
-      return response['settings'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(response['settings'])
-          : <String, dynamic>{};
-    }).catchError((error) {
-      if (error is VendorApiException &&
-          error.statusCode == ApiStatusCodes.notFound) {
-        SecureLogger.warning('Settings endpoint unavailable, using defaults');
-        return <String, dynamic>{};
-      }
-      throw error;
-    });
+    return _makeRequest(ApiMethods.get, '/settings')
+        .then((response) {
+          final rawData = response['data'];
+          if (rawData is Map<String, dynamic>) {
+            return rawData;
+          }
+          return response['settings'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(response['settings'])
+              : <String, dynamic>{};
+        })
+        .catchError((error) {
+          if (error is VendorApiException &&
+              error.statusCode == ApiStatusCodes.notFound) {
+            SecureLogger.warning(
+              'Settings endpoint unavailable, using defaults',
+            );
+            return <String, dynamic>{};
+          }
+          throw error;
+        });
   }
 
   static Future<Map<String, dynamic>> updateVendorSettings(

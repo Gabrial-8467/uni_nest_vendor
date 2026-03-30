@@ -342,7 +342,8 @@ class ImageUploadService {
         if (url != null) return url;
       } else if (first is Map) {
         final mapFirst = Map<String, dynamic>.from(first);
-        final url = read(mapFirst['secure_url']) ??
+        final url =
+            read(mapFirst['secure_url']) ??
             read(mapFirst['imageUrl']) ??
             read(mapFirst['url']);
         if (url != null) return url;

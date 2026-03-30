@@ -544,8 +544,7 @@ class VendorProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      final newProduct =
-          (imageFiles != null && imageFiles.isNotEmpty)
+      final newProduct = (imageFiles != null && imageFiles.isNotEmpty)
           ? await VendorApiService.createProductWithImages(
               productData,
               imageFiles,
@@ -569,8 +568,9 @@ class VendorProvider extends ChangeNotifier {
   // Update product
   Future<bool> updateProduct(
     String productId,
-    Map<String, dynamic> productData,
-  ) async {
+    Map<String, dynamic> productData, {
+    List<File>? imageFiles,
+  }) async {
     if (!_isAuthenticated || _authToken == null || _currentVendor == null) {
       return false;
     }
@@ -583,6 +583,7 @@ class VendorProvider extends ChangeNotifier {
         productId,
         productData,
         _authToken!,
+        imageFiles: imageFiles,
       );
 
       final index = _products.indexWhere((p) => p.id == productId);
