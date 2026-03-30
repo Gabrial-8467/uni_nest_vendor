@@ -938,6 +938,10 @@ class VendorApiService {
     );
   }
 
+  static Future<Map<String, dynamic>> clearAllNotifications(String authToken) {
+    return _makeRequest(ApiMethods.delete, ApiEndpoints.clearAllNotifications);
+  }
+
   static Future<Map<String, dynamic>> sendNotificationLegacy(
     String vendorId,
     Map<String, dynamic> notificationData,

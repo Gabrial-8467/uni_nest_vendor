@@ -106,22 +106,54 @@ class _NotificationScreenState extends State<NotificationScreen> {
     });
   }
 
-  void _markAllAsRead() {
-    setState(() {
-      notifications = notifications
-          .map(
-            (notification) => Notification(
-              id: notification.id,
-              title: notification.title,
-              message: notification.message,
-              timestamp: notification.timestamp,
-              type: notification.type,
-              isRead: true,
-              data: notification.data,
-            ),
-          )
-          .toList();
-    });
+  void _markAllAsRead() async {
+    try {
+      final authToken = await AuthService().getAuthToken();
+      if (authToken != null) {
+        final response = await VendorApiService.markAllNotificationsAsRead(
+          authToken,
+        );
+        if (response['success'] == true) {
+          setState(() {
+            notifications = notifications
+                .map(
+                  (notification) => Notification(
+                    id: notification.id,
+                    title: notification.title,
+                    message: notification.message,
+                    timestamp: notification.timestamp,
+                    type: notification.type,
+                    isRead: true,
+                    data: notification.data,
+                  ),
+                )
+                .toList();
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('All notifications marked as read')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  response['message'] ?? 'Failed to mark all as read',
+                ),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      SecureLogger.error('Failed to mark all notifications as read', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to mark all as read')),
+        );
+      }
+    }
   }
 
   void _deleteNotification(String notificationId) {
@@ -130,10 +162,42 @@ class _NotificationScreenState extends State<NotificationScreen> {
     });
   }
 
-  void _clearAllNotifications() {
-    setState(() {
-      notifications.clear();
-    });
+  void _clearAllNotifications() async {
+    try {
+      final authToken = await AuthService().getAuthToken();
+      if (authToken != null) {
+        final response = await VendorApiService.clearAllNotifications(
+          authToken,
+        );
+        if (response['success'] == true) {
+          setState(() {
+            notifications.clear();
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('All notifications cleared')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  response['message'] ?? 'Failed to clear notifications',
+                ),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      SecureLogger.error('Failed to clear all notifications', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to clear notifications')),
+        );
+      }
+    }
   }
 
   @override

@@ -37,6 +37,7 @@ class ApiEndpoints {
   static const String notifications = '/notifications';
   static String notificationById(String id) => '/notifications/$id';
   static const String markAllNotificationsRead = '/notifications/mark-all-read';
+  static const String clearAllNotifications = '/notifications/clear-all';
   static String markNotificationRead(String id) => '/notifications/$id/read';
   static const String notificationSettings = '/notifications/settings';
   static const String sendNotification = '/notifications/send';
