@@ -368,6 +368,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                     },
                   ),
                   const SizedBox(height: 20),
+                  _buildSettlementSection(vendorProvider, isSmallScreen),
+                  const SizedBox(height: 20),
 
                   // Analytics Cards - Responsive layout
                   isSmallScreen
@@ -418,6 +420,123 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildSettlementSection(
+    VendorProvider vendorProvider,
+    bool isSmallScreen,
+  ) {
+    final latestPayout = vendorProvider.latestPayout;
+
+    final cards = [
+      AnalyticsCard(
+        title: 'Available Balance',
+        value:
+            '₹${vendorProvider.availableSettlementBalance.toStringAsFixed(2)}',
+        icon: Icons.account_balance_wallet_outlined,
+        color: Colors.green,
+      ),
+      AnalyticsCard(
+        title: 'Pending Settlement',
+        value:
+            '₹${vendorProvider.pendingSettlementBalance.toStringAsFixed(2)}',
+        icon: Icons.hourglass_top_outlined,
+        color: Colors.orange,
+      ),
+      AnalyticsCard(
+        title: 'Commission Owed',
+        value: '₹${vendorProvider.totalCommissionOwed.toStringAsFixed(2)}',
+        icon: Icons.receipt_long_outlined,
+        color: Colors.redAccent,
+      ),
+      AnalyticsCard(
+        title: 'Latest Payout',
+        value: latestPayout == null
+            ? 'No payouts yet'
+            : '₹${latestPayout.amount.toStringAsFixed(2)}',
+        icon: Icons.payments_outlined,
+        color: Colors.blue,
+        change: latestPayout?.status.toUpperCase(),
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Payments & Settlements',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3436),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Live balance and payout visibility from the backend ledger',
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: cards.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isSmallScreen ? 1 : 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: isSmallScreen ? 2.6 : 2.2,
+            ),
+            itemBuilder: (context, index) => cards[index],
+          ),
+          if (latestPayout != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.schedule_outlined, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Last payout ${latestPayout.status.toUpperCase()} on ${_formatCompactDate(latestPayout.createdAt)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF2D3436),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatCompactDate(DateTime dateTime) {
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    return '$day/$month/${dateTime.year}';
   }
 
 }

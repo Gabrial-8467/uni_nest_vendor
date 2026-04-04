@@ -13,7 +13,9 @@ class VendorProvider extends ChangeNotifier {
   Vendor? _currentVendor;
   List<Product> _products = [];
   List<Order> _orders = [];
+  List<VendorPayout> _payouts = [];
   VendorAnalytics? _analytics;
+  VendorLedger? _ledger;
   Map<String, dynamic> _earnings = {};
   Map<String, dynamic> _settings = {};
 
@@ -23,6 +25,8 @@ class VendorProvider extends ChangeNotifier {
   bool _isLoadingOrders = false;
   bool _isLoadingAnalytics = false;
   bool _isLoadingEarnings = false;
+  bool _isLoadingLedger = false;
+  bool _isLoadingPayouts = false;
 
   // Error States
   String? _error;
@@ -30,6 +34,8 @@ class VendorProvider extends ChangeNotifier {
   String? _ordersError;
   String? _analyticsError;
   String? _earningsError;
+  String? _ledgerError;
+  String? _payoutsError;
 
   // Authentication
   bool _isAuthenticated = false;
@@ -40,7 +46,9 @@ class VendorProvider extends ChangeNotifier {
   Vendor? get currentVendor => _currentVendor;
   List<Product> get products => _products;
   List<Order> get orders => _orders;
+  List<VendorPayout> get payouts => _payouts;
   VendorAnalytics? get analytics => _analytics;
+  VendorLedger? get ledger => _ledger;
   Map<String, dynamic> get earnings => _earnings;
   Map<String, dynamic> get settings => _settings;
 
@@ -49,12 +57,16 @@ class VendorProvider extends ChangeNotifier {
   bool get isLoadingOrders => _isLoadingOrders;
   bool get isLoadingAnalytics => _isLoadingAnalytics;
   bool get isLoadingEarnings => _isLoadingEarnings;
+  bool get isLoadingLedger => _isLoadingLedger;
+  bool get isLoadingPayouts => _isLoadingPayouts;
 
   String? get error => _error;
   String? get productsError => _productsError;
   String? get ordersError => _ordersError;
   String? get analyticsError => _analyticsError;
   String? get earningsError => _earningsError;
+  String? get ledgerError => _ledgerError;
+  String? get payoutsError => _payoutsError;
 
   bool get isAuthenticated => _isAuthenticated;
   String? get authToken => _authToken;
@@ -292,7 +304,9 @@ class VendorProvider extends ChangeNotifier {
       _isAuthenticated = false;
       _products = [];
       _orders = [];
+      _payouts = [];
       _analytics = null;
+      _ledger = null;
       _earnings = {};
       _settings = {};
 
@@ -314,6 +328,8 @@ class VendorProvider extends ChangeNotifier {
       loadOrders(),
       loadAnalytics(),
       loadEarnings(),
+      loadLedger(),
+      loadPayouts(),
       loadSettings(),
     ]);
   }
@@ -425,6 +441,46 @@ class VendorProvider extends ChangeNotifier {
       SecureLogger.error('Failed to load earnings', error: e);
     } finally {
       _setLoadingEarnings(false);
+    }
+  }
+
+  Future<void> loadLedger() async {
+    if (!await _ensureAuthenticatedSession()) {
+      return;
+    }
+
+    _setLoadingLedger(true);
+    _ledgerError = null;
+
+    try {
+      _ledger = await VendorApiService.getVendorLedger(_authToken!);
+      SecureLogger.info('Loaded vendor ledger', tag: 'LEDGER');
+    } catch (e) {
+      await _handleUnauthorizedIfNeeded(e);
+      _ledgerError = 'Failed to load ledger: ${e.toString()}';
+      SecureLogger.error('Failed to load ledger', error: e);
+    } finally {
+      _setLoadingLedger(false);
+    }
+  }
+
+  Future<void> loadPayouts() async {
+    if (!await _ensureAuthenticatedSession()) {
+      return;
+    }
+
+    _setLoadingPayouts(true);
+    _payoutsError = null;
+
+    try {
+      _payouts = await VendorApiService.getVendorPayouts(_authToken!);
+      SecureLogger.info('Loaded ${_payouts.length} payouts', tag: 'PAYOUTS');
+    } catch (e) {
+      await _handleUnauthorizedIfNeeded(e);
+      _payoutsError = 'Failed to load payouts: ${e.toString()}';
+      SecureLogger.error('Failed to load payouts', error: e);
+    } finally {
+      _setLoadingPayouts(false);
     }
   }
 
@@ -698,6 +754,16 @@ class VendorProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _setLoadingLedger(bool loading) {
+    _isLoadingLedger = loading;
+    notifyListeners();
+  }
+
+  void _setLoadingPayouts(bool loading) {
+    _isLoadingPayouts = loading;
+    notifyListeners();
+  }
+
   // JSON encoding/decoding helpers
   Future<String> _encodeJson(Map<String, dynamic> data) async {
     // In a real implementation, this would use encryption
@@ -737,14 +803,32 @@ class VendorProvider extends ChangeNotifier {
   // Get pending orders count
   int get pendingOrdersCount {
     return _orders
-        .where((o) => o.status == 'pending' || o.status == 'confirmed')
+        .where(
+          (o) =>
+              o.status == 'pending' ||
+              o.status == 'payment_pending' ||
+              o.status == 'confirmed',
+        )
         .length;
   }
 
   // Get total revenue
   double get totalRevenue {
-    return _earnings['totalRevenue']?.toDouble() ?? 0.0;
+    return _earnings['totalRevenue']?.toDouble() ??
+        _analytics?.totalRevenue ??
+        _ledger?.totalEarnings ??
+        0.0;
   }
+
+  double get availableSettlementBalance => _ledger?.availableAmount ?? 0.0;
+
+  double get pendingSettlementBalance => _ledger?.pendingAmount ?? 0.0;
+
+  double get totalCommissionOwed => _ledger?.totalCommissionOwed ?? 0.0;
+
+  double get platformReceivable => _ledger?.platformReceivable ?? 0.0;
+
+  VendorPayout? get latestPayout => _payouts.isEmpty ? null : _payouts.first;
 
   // Get today's revenue
   double get todayRevenue {
@@ -911,6 +995,8 @@ class VendorProvider extends ChangeNotifier {
     _ordersError = null;
     _analyticsError = null;
     _earningsError = null;
+    _ledgerError = null;
+    _payoutsError = null;
     notifyListeners();
   }
 

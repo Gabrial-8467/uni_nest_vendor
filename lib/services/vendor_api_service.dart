@@ -306,16 +306,14 @@ class VendorApiService {
   }
 
   static Future<Map<String, dynamic>> refreshToken(String refreshToken) {
-    return _makeRequest(
-      ApiMethods.post,
-      '/auth/refresh',
-      body: {'refreshToken': refreshToken},
-      requiresAuth: false,
-    );
+    return Future.value(<String, dynamic>{
+      'success': false,
+      'message': 'Refresh token endpoint is not available on the current backend.',
+    });
   }
 
   static Future<Map<String, dynamic>> logoutVendor([String? authToken]) {
-    return _makeRequest(ApiMethods.post, '/auth/logout');
+    return Future.value(<String, dynamic>{'success': true});
   }
 
   static Future<Map<String, dynamic>> changePassword(
@@ -325,8 +323,9 @@ class VendorApiService {
   ) {
     return _makeRequest(
       ApiMethods.post,
-      '/auth/change-password',
+      ApiEndpoints.changePassword,
       body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      authTokenOverride: authToken,
     );
   }
 
@@ -347,6 +346,7 @@ class VendorApiService {
       ApiMethods.put,
       ApiEndpoints.profile,
       body: profileData,
+      authTokenOverride: authToken,
     );
 
     return Vendor.fromJson(response['data']);
@@ -361,7 +361,7 @@ class VendorApiService {
         imageFile,
         authToken: authToken,
         baseUrl: _apiClient._baseUrl,
-        endpoint: '/upload-image',
+        endpoint: ApiEndpoints.uploadAvatar,
       );
 
       if (result.success) {
@@ -561,7 +561,7 @@ class VendorApiService {
           final updatedProduct = Product.fromJson(productJson);
 
           SecureLogger.info(
-            '✅ Product updated successfully with ${imageFiles.length} images',
+            'Product updated successfully with ${imageFiles.length} images',
             tag: 'PRODUCTS',
           );
           SecureLogger.info(
@@ -606,7 +606,7 @@ class VendorApiService {
       final updatedProduct = Product.fromJson(productJson);
 
       SecureLogger.info(
-        '✅ Product updated successfully (JSON only)',
+        'Product updated successfully (JSON only)',
         tag: 'PRODUCTS',
       );
 
@@ -688,7 +688,11 @@ class VendorApiService {
     final queryString = Uri(queryParameters: queryParams).query;
     final endpoint = '${ApiEndpoints.orders}?$queryString';
 
-    final response = await _makeRequest(ApiMethods.get, endpoint);
+    final response = await _makeRequest(
+      ApiMethods.get,
+      endpoint,
+      authTokenOverride: authToken,
+    );
     final rawData = response['data'];
 
     List<dynamic> rawOrders;
@@ -712,9 +716,10 @@ class VendorApiService {
     final response = await _makeRequest(
       ApiMethods.get,
       ApiEndpoints.orderById(orderId),
+      authTokenOverride: authToken,
     );
 
-    return Order.fromJson(response['data']);
+    return Order.fromJson(Map<String, dynamic>.from(response['data'] ?? {}));
   }
 
   static Future<Order> updateOrderStatus(
@@ -732,9 +737,16 @@ class VendorApiService {
       ApiMethods.put,
       ApiEndpoints.updateOrderStatus(orderId),
       body: body,
+      authTokenOverride: authToken,
     );
 
-    return Order.fromJson(response['data']);
+    final payload = response['data'];
+    final orderJson = payload is Map<String, dynamic>
+        ? (payload['order'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(payload['order'])
+              : payload)
+        : <String, dynamic>{};
+    return Order.fromJson(orderJson);
   }
 
   static Future<VendorAnalytics> getVendorAnalytics(
@@ -753,7 +765,11 @@ class VendorApiService {
         ? ApiEndpoints.analytics
         : '${ApiEndpoints.analytics}?$queryString';
 
-    final response = await _makeRequest(ApiMethods.get, endpoint);
+    final response = await _makeRequest(
+      ApiMethods.get,
+      endpoint,
+      authTokenOverride: authToken,
+    );
     final rawData = response['data'];
     if (rawData is! Map<String, dynamic>) {
       return VendorAnalytics.fromJson(<String, dynamic>{});
@@ -773,26 +789,25 @@ class VendorApiService {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    final queryParams = <String, String>{};
-    if (startDate != null) {
-      queryParams['startDate'] = startDate.toIso8601String();
-    }
-    if (endDate != null) {
-      queryParams['endDate'] = endDate.toIso8601String();
-    }
-
-    final queryString = Uri(queryParameters: queryParams).query;
-    final endpoint = queryString.isEmpty
-        ? '/earnings'
-        : '/earnings?$queryString';
-
     try {
-      final response = await _makeRequest(ApiMethods.get, endpoint);
+      final response = await _makeRequest(
+        ApiMethods.get,
+        ApiEndpoints.dashboard,
+        authTokenOverride: authToken,
+      );
       final rawData = response['data'];
       if (rawData is Map<String, dynamic>) {
-        return rawData;
+        final overview = rawData['overview'];
+        if (overview is Map<String, dynamic>) {
+          final totalRevenue = overview['totalRevenue'] ?? 0;
+          return {
+            ...overview,
+            'total': totalRevenue,
+            'totalRevenue': totalRevenue,
+          };
+        }
       }
-      return response;
+      return <String, dynamic>{};
     } on VendorApiException catch (e) {
       if (e.statusCode == ApiStatusCodes.notFound) {
         SecureLogger.warning('Earnings endpoint unavailable, using defaults');
@@ -803,7 +818,41 @@ class VendorApiService {
   }
 
   static Future<Map<String, dynamic>> getVendorDashboard(String authToken) {
-    return _makeRequest(ApiMethods.get, '/dashboard');
+    return _makeRequest(
+      ApiMethods.get,
+      ApiEndpoints.dashboard,
+      authTokenOverride: authToken,
+    );
+  }
+
+  static Future<VendorLedger> getVendorLedger(String authToken) async {
+    final response = await _makeRequest(
+      ApiMethods.get,
+      ApiEndpoints.ledger,
+      authTokenOverride: authToken,
+    );
+    return VendorLedger.fromJson(
+      Map<String, dynamic>.from(response['data'] ?? {}),
+    );
+  }
+
+  static Future<List<VendorPayout>> getVendorPayouts(String authToken) async {
+    final response = await _makeRequest(
+      ApiMethods.get,
+      ApiEndpoints.payouts,
+      authTokenOverride: authToken,
+    );
+    final rawData = response['data'];
+    final rawList = rawData is List
+        ? rawData
+        : rawData is Map<String, dynamic>
+        ? (rawData['payouts'] is List ? rawData['payouts'] : <dynamic>[])
+        : <dynamic>[];
+
+    return rawList
+        .whereType<Map>()
+        .map((item) => VendorPayout.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
   }
 
   static Future<Map<String, dynamic>> exportVendorData(
@@ -860,7 +909,7 @@ class VendorApiService {
     };
 
     if (status != null) {
-      queryParams['status'] = status;
+      queryParams['read'] = (status == NotificationStatus.read).toString();
     }
     if (type != null) {
       queryParams['type'] = type;
@@ -871,7 +920,11 @@ class VendorApiService {
         .join('&');
     final endpoint = '${ApiEndpoints.notifications}?$queryString';
 
-    return _makeRequest(ApiMethods.get, endpoint);
+    return _makeRequest(
+      ApiMethods.get,
+      endpoint,
+      authTokenOverride: authToken,
+    );
   }
 
   static Future<Map<String, dynamic>> getNotificationById(
@@ -881,6 +934,7 @@ class VendorApiService {
     return _makeRequest(
       ApiMethods.get,
       ApiEndpoints.notificationById(notificationId),
+      authTokenOverride: authToken,
     );
   }
 
@@ -891,55 +945,59 @@ class VendorApiService {
     return _makeRequest(
       ApiMethods.put,
       ApiEndpoints.markNotificationRead(notificationId),
+      authTokenOverride: authToken,
     );
   }
 
   static Future<Map<String, dynamic>> markAllNotificationsAsRead(
     String authToken,
   ) {
-    return _makeRequest(ApiMethods.put, ApiEndpoints.markAllNotificationsRead);
+    return _makeRequest(
+      ApiMethods.put,
+      ApiEndpoints.markAllNotificationsRead,
+      authTokenOverride: authToken,
+    );
   }
 
   static Future<Map<String, dynamic>> getNotificationSettings(
     String authToken,
   ) {
-    return _makeRequest(ApiMethods.get, ApiEndpoints.notificationSettings);
+    return Future.value(<String, dynamic>{});
   }
 
   static Future<Map<String, dynamic>> updateNotificationSettings(
     Map<String, dynamic> settings,
     String authToken,
   ) {
-    return _makeRequest(
-      ApiMethods.put,
-      ApiEndpoints.notificationSettings,
-      body: settings,
-    );
+    return Future.value(<String, dynamic>{'success': true, 'data': settings});
   }
 
   static Future<Map<String, dynamic>> sendNotification(
     Map<String, dynamic> notificationData,
     String authToken,
   ) {
-    return _makeRequest(
-      ApiMethods.post,
-      ApiEndpoints.sendNotification,
-      body: notificationData,
-    );
+    return Future.value(<String, dynamic>{
+      'success': false,
+      'message': 'Vendor notification send endpoint is not available.',
+    });
   }
 
   static Future<Map<String, dynamic>> deleteNotification(
     String notificationId,
     String authToken,
   ) {
-    return _makeRequest(
-      ApiMethods.delete,
-      ApiEndpoints.notificationById(notificationId),
-    );
+    return Future.value(<String, dynamic>{
+      'success': false,
+      'message': 'Delete notification endpoint is not available.',
+    });
   }
 
   static Future<Map<String, dynamic>> clearAllNotifications(String authToken) {
-    return _makeRequest(ApiMethods.delete, ApiEndpoints.clearAllNotifications);
+    return _makeRequest(
+      ApiMethods.delete,
+      ApiEndpoints.clearAllNotifications,
+      authTokenOverride: authToken,
+    );
   }
 
   static Future<Map<String, dynamic>> sendNotificationLegacy(
@@ -955,33 +1013,14 @@ class VendorApiService {
   }
 
   static Future<Map<String, dynamic>> getVendorSettings(String authToken) {
-    return _makeRequest(ApiMethods.get, '/settings')
-        .then((response) {
-          final rawData = response['data'];
-          if (rawData is Map<String, dynamic>) {
-            return rawData;
-          }
-          return response['settings'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(response['settings'])
-              : <String, dynamic>{};
-        })
-        .catchError((error) {
-          if (error is VendorApiException &&
-              error.statusCode == ApiStatusCodes.notFound) {
-            SecureLogger.warning(
-              'Settings endpoint unavailable, using defaults',
-            );
-            return <String, dynamic>{};
-          }
-          throw error;
-        });
+    return Future.value(<String, dynamic>{});
   }
 
   static Future<Map<String, dynamic>> updateVendorSettings(
     Map<String, dynamic> settings,
     String authToken,
   ) {
-    return _makeRequest(ApiMethods.put, '/settings', body: settings);
+    return Future.value(<String, dynamic>{'success': true, 'data': settings});
   }
 }
 

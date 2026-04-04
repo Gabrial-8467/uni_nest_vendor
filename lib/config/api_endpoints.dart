@@ -7,9 +7,13 @@ class ApiEndpoints {
   // Authentication Endpoints
   static const String register = '/auth/register';
   static const String login = '/auth/login';
+  static const String changePassword = '/auth/change-password';
 
   // Profile Endpoints
   static const String profile = '/profile';
+  static const String dashboard = '/dashboard';
+  static const String ledger = '/ledger';
+  static const String payouts = '/payouts';
 
   // Product Endpoints
   static const String products = '/products';

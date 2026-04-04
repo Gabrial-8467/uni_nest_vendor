@@ -268,6 +268,17 @@ class Product {
     return null;
   }
 
+  static bool _toBool(dynamic value, {bool defaultValue = false}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1') return true;
+      if (normalized == 'false' || normalized == '0') return false;
+    }
+    return defaultValue;
+  }
+
   static List<String> _extractImages(Map<String, dynamic> json) {
     final rawImages =
         json['images'] ??
@@ -314,6 +325,16 @@ class Product {
     final vendorId = rawVendor is Map
         ? _readString(rawVendor['id'] ?? rawVendor['_id'])
         : _readString(rawVendor);
+    final availability = _readString(json['availability']).toLowerCase();
+    final stockQuantity = _toInt(
+      json['stockQuantity'] ?? json['inStock'] ?? json['stock'],
+    );
+    final isAvailable =
+        json.containsKey('isAvailable')
+            ? _toBool(json['isAvailable'], defaultValue: true)
+            : availability.isNotEmpty
+            ? availability == 'in_stock'
+            : stockQuantity > 0;
 
     return Product(
       id: _readString(json['id'] ?? json['_id']),
@@ -323,8 +344,8 @@ class Product {
       price: _toDouble(json['price']),
       category: _readString(json['category']),
       images: _extractImages(json),
-      isAvailable: json['isAvailable'] ?? true,
-      stockQuantity: _toInt(json['stockQuantity'] ?? json['inStock']),
+      isAvailable: isAvailable,
+      stockQuantity: stockQuantity,
       tags: List<String>.from((json['tags'] as List?) ?? const []),
       nutritionalInfo: json['nutritionalInfo'] is Map
           ? Map<String, dynamic>.from(json['nutritionalInfo'])
@@ -353,6 +374,8 @@ class Product {
       'images': images,
       'isAvailable': isAvailable,
       'stockQuantity': stockQuantity,
+      'availability': isAvailable ? 'in_stock' : 'out_of_stock',
+      'stock': stockQuantity,
       'tags': tags,
       'nutritionalInfo': nutritionalInfo,
       'createdAt': createdAt.toIso8601String(),
@@ -408,8 +431,11 @@ class Product {
 
 class Order {
   final String id;
+  final String orderNumber;
   final String vendorId;
   final String customerId;
+  final String customerName;
+  final String customerPhone;
   final List<OrderItem> items;
   final double totalAmount;
   final double discountAmount;
@@ -427,8 +453,11 @@ class Order {
 
   Order({
     required this.id,
+    required this.orderNumber,
     required this.vendorId,
     required this.customerId,
+    required this.customerName,
+    required this.customerPhone,
     required this.items,
     required this.totalAmount,
     required this.discountAmount,
@@ -445,23 +474,73 @@ class Order {
     required this.metadata,
   });
 
+  static String _readString(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
   factory Order.fromJson(Map<String, dynamic> json) {
+    final customer = json['customer'] is Map
+        ? Map<String, dynamic>.from(json['customer'])
+        : <String, dynamic>{};
+    final deliveryAddress = json['deliveryAddress'] is Map
+        ? Map<String, dynamic>.from(json['deliveryAddress'])
+        : <String, dynamic>{};
+    final pricing = json['pricing'] is Map
+        ? Map<String, dynamic>.from(json['pricing'])
+        : <String, dynamic>{};
+    final rawVendor = json['vendorId'] ?? json['vendor'];
+    final rawCustomer = json['customerId'] ?? json['customer'];
+    final orderId = _readString(json['id'] ?? json['_id']);
+    final orderNumber = _readString(json['orderNumber']);
+
     return Order(
-      id: json['id'] ?? '',
-      vendorId: json['vendorId'] ?? '',
-      customerId: json['customerId'] ?? '',
+      id: orderId,
+      orderNumber: orderNumber.isNotEmpty ? orderNumber : orderId,
+      vendorId: rawVendor is Map
+          ? _readString(rawVendor['_id'] ?? rawVendor['id'])
+          : _readString(rawVendor),
+      customerId: rawCustomer is Map
+          ? _readString(rawCustomer['_id'] ?? rawCustomer['id'])
+          : _readString(rawCustomer),
+      customerName: _readString(
+        json['customerName'] ?? customer['name'] ?? deliveryAddress['name'],
+      ),
+      customerPhone: _readString(
+        json['customerPhone'] ?? customer['phone'] ?? deliveryAddress['phone'],
+      ),
       items:
           (json['items'] as List<dynamic>?)
-              ?.map((item) => OrderItem.fromJson(item))
+              ?.whereType<Map>()
+              .map((item) => OrderItem.fromJson(Map<String, dynamic>.from(item)))
               .toList() ??
           [],
-      totalAmount: (json['totalAmount'] ?? 0.0).toDouble(),
-      discountAmount: (json['discountAmount'] ?? 0.0).toDouble(),
-      finalAmount: (json['finalAmount'] ?? 0.0).toDouble(),
-      status: json['status'] ?? 'pending',
-      paymentMethod: json['paymentMethod'] ?? '',
-      paymentStatus: json['paymentStatus'] ?? 'pending',
-      deliveryAddress: json['deliveryAddress'] ?? {},
+      totalAmount: _toDouble(json['totalAmount'] ?? json['subtotal']),
+      discountAmount: _toDouble(json['discountAmount'] ?? json['discount']),
+      finalAmount: _toDouble(
+        json['finalAmount'] ??
+            json['totalAmount'] ??
+            json['total'] ??
+            pricing['finalPayableAmount'],
+      ),
+      status: _readString(json['status'] ?? json['orderStatus']).isEmpty
+          ? 'pending'
+          : _readString(json['status'] ?? json['orderStatus']),
+      paymentMethod: _readString(
+        json['paymentMethod'] ?? json['payment']?['method'],
+      ),
+      paymentStatus: _readString(
+        json['paymentStatus'] ?? json['payment']?['status'],
+      ).isEmpty
+          ? 'pending'
+          : _readString(json['paymentStatus'] ?? json['payment']?['status']),
+      deliveryAddress: deliveryAddress,
       createdAt: DateTime.parse(
         json['createdAt'] ?? DateTime.now().toIso8601String(),
       ),
@@ -480,8 +559,11 @@ class Order {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'orderNumber': orderNumber,
       'vendorId': vendorId,
       'customerId': customerId,
+      'customerName': customerName,
+      'customerPhone': customerPhone,
       'items': items.map((item) => item.toJson()).toList(),
       'totalAmount': totalAmount,
       'discountAmount': discountAmount,
@@ -520,14 +602,37 @@ class OrderItem {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
+    final product = json['product'] is Map
+        ? Map<String, dynamic>.from(json['product'])
+        : <String, dynamic>{};
+    final productImages = product['images'];
+    String productImage = '';
+    if (productImages is List && productImages.isNotEmpty) {
+      productImage = Product._extractImageString(productImages.first) ?? '';
+    }
+
     return OrderItem(
-      productId: json['productId'] ?? '',
-      productName: json['productName'] ?? '',
-      productImage: json['productImage'] ?? '',
-      quantity: json['quantity'] ?? 0,
-      unitPrice: (json['unitPrice'] ?? 0.0).toDouble(),
-      totalPrice: (json['totalPrice'] ?? 0.0).toDouble(),
-      customization: json['customization'] ?? {},
+      productId:
+          (json['productId'] ??
+                  json['product']?['_id'] ??
+                  json['product']?['id'] ??
+                  '')
+              .toString(),
+      productName:
+          (json['productName'] ?? json['name'] ?? product['name'] ?? '')
+              .toString(),
+      productImage:
+          (json['productImage'] ?? productImage).toString(),
+      quantity: json['quantity'] is num ? (json['quantity'] as num).toInt() : 0,
+      unitPrice: Order._toDouble(
+        json['unitPrice'] ?? json['price'] ?? json['linePrice'],
+      ),
+      totalPrice: Order._toDouble(
+        json['totalPrice'] ?? json['subtotal'] ?? json['lineTotal'],
+      ),
+      customization: json['customization'] is Map
+          ? Map<String, dynamic>.from(json['customization'])
+          : {},
     );
   }
 
@@ -541,6 +646,91 @@ class OrderItem {
       'totalPrice': totalPrice,
       'customization': customization,
     };
+  }
+}
+
+class VendorLedger {
+  final String vendorId;
+  final double totalEarnings;
+  final double totalCommissionOwed;
+  final double pendingAmount;
+  final double availableAmount;
+  final double paidAmount;
+  final double platformReceivable;
+  final DateTime? lastSettledAt;
+
+  VendorLedger({
+    required this.vendorId,
+    required this.totalEarnings,
+    required this.totalCommissionOwed,
+    required this.pendingAmount,
+    required this.availableAmount,
+    required this.paidAmount,
+    required this.platformReceivable,
+    this.lastSettledAt,
+  });
+
+  factory VendorLedger.fromJson(Map<String, dynamic> json) {
+    return VendorLedger(
+      vendorId: (json['vendorId'] ?? json['_id'] ?? '').toString(),
+      totalEarnings: Order._toDouble(json['totalEarnings']),
+      totalCommissionOwed: Order._toDouble(json['totalCommissionOwed']),
+      pendingAmount: Order._toDouble(json['pendingAmount']),
+      availableAmount: Order._toDouble(json['availableAmount']),
+      paidAmount: Order._toDouble(json['paidAmount']),
+      platformReceivable: Order._toDouble(json['platformReceivable']),
+      lastSettledAt: json['lastSettledAt'] != null
+          ? DateTime.tryParse(json['lastSettledAt'].toString())
+          : null,
+    );
+  }
+}
+
+class VendorPayout {
+  final String id;
+  final String vendorId;
+  final double amount;
+  final String currency;
+  final String status;
+  final String? bankReference;
+  final String? failureReason;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+  final DateTime? failedAt;
+
+  VendorPayout({
+    required this.id,
+    required this.vendorId,
+    required this.amount,
+    required this.currency,
+    required this.status,
+    this.bankReference,
+    this.failureReason,
+    required this.createdAt,
+    this.completedAt,
+    this.failedAt,
+  });
+
+  factory VendorPayout.fromJson(Map<String, dynamic> json) {
+    return VendorPayout(
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      vendorId: (json['vendorId'] ?? '').toString(),
+      amount: Order._toDouble(json['amount']),
+      currency: (json['currency'] ?? 'INR').toString(),
+      status: (json['status'] ?? 'initiated').toString(),
+      bankReference: json['bankReference']?.toString(),
+      failureReason: json['failureReason']?.toString(),
+      createdAt: DateTime.tryParse(
+            json['createdAt']?.toString() ?? '',
+          ) ??
+          DateTime.now(),
+      completedAt: json['completedAt'] != null
+          ? DateTime.tryParse(json['completedAt'].toString())
+          : null,
+      failedAt: json['failedAt'] != null
+          ? DateTime.tryParse(json['failedAt'].toString())
+          : null,
+    );
   }
 }
 

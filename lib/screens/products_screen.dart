@@ -987,16 +987,9 @@ class _AddProductDialogState extends State<AddProductDialog> {
           'description': _descriptionController.text.trim(),
           'price': double.parse(_priceController.text),
           'category': normalizedCategory,
-          'image': finalImageUrls.first,
           'images': finalImageUrls,
-          'isAvailable': _isAvailable,
-          'stockQuantity': stockQuantity,
-          'inStock': stockQuantity,
-          'tags': [],
-          'nutritionalInfo': {},
-          'discountPercentage': _discountController.text.isNotEmpty
-              ? double.parse(_discountController.text)
-              : null,
+          'availability': _isAvailable ? 'in_stock' : 'out_of_stock',
+          'stock': stockQuantity,
           'isFeatured': _isFeatured,
         };
 
@@ -1011,14 +1004,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
           'description': _descriptionController.text.trim(),
           'price': double.parse(_priceController.text),
           'category': normalizedCategory,
-          'isAvailable': _isAvailable,
-          'stockQuantity': stockQuantity,
-          'inStock': stockQuantity,
-          'tags': [],
-          'nutritionalInfo': {},
-          'discountPercentage': _discountController.text.isNotEmpty
-              ? double.parse(_discountController.text)
-              : null,
+          'availability': _isAvailable ? 'in_stock' : 'out_of_stock',
+          'stock': stockQuantity,
           'isFeatured': _isFeatured,
         };
 
