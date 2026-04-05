@@ -13,6 +13,8 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/order_list_card.dart';
 import '../../widgets/summary_tile.dart';
 import 'order_details_screen.dart';
+import 'products_screen.dart';
+import 'add_product_screen.dart';
 
 class VendorDashboardTab extends ConsumerWidget {
   const VendorDashboardTab({super.key});
@@ -44,6 +46,46 @@ class VendorDashboardTab extends ConsumerWidget {
             activeOrders: activeOrders.length,
             deliveredOrders: deliveredCount,
             cancelledOrders: cancelledCount,
+          ),
+          const SizedBox(height: 16),
+          _SectionBox(
+            title: 'Quick Actions',
+            subtitle: 'Manage your products and view analytics',
+            child: Row(
+              children: [
+                Expanded(
+                  child: _QuickActionCard(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Manage Products',
+                    subtitle: 'Add, edit, or remove products',
+                    color: AppTheme.primary,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProductsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickActionCard(
+                    icon: Icons.add_circle_outline,
+                    title: 'Add Product',
+                    subtitle: 'Create a new product listing',
+                    color: AppTheme.success,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AddProductScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           _SectionBox(
@@ -437,6 +479,67 @@ class _SectionBox extends StatelessWidget {
           const SizedBox(height: 16),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 2,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

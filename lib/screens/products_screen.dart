@@ -23,7 +23,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../config/api_endpoints.dart';
 import '../config/vendor_config.dart';
@@ -32,6 +32,7 @@ import '../utils/app_theme.dart';
 import '../utils/product_image_helper.dart';
 import '../services/image_upload_service.dart';
 import '../utils/secure_logger.dart';
+import 'add_product_screen.dart';
 
 // =============================================================================
 // IMAGE HELPER FUNCTIONS
@@ -54,14 +55,14 @@ String _resolveImageUrl(String rawPath, {String? cacheBustKey}) =>
 // PRODUCT MANAGEMENT STATE
 // =============================================================================
 
-class ProductsScreen extends StatefulWidget {
+class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
 
   @override
-  State<ProductsScreen> createState() => _ProductsScreenState();
+  ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> {
+class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'All';
   late final VoidCallback _searchListener;
@@ -122,9 +123,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _showAddProductDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const AddProductDialog(),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddProductScreen()),
     );
   }
 
@@ -151,10 +152,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.of(dialogContext).pop();
-              final vendorProvider = Provider.of<VendorProvider>(
-                context,
-                listen: false,
-              );
+              final vendorProvider = ref.read(vendorProviderProvider);
               final success = await vendorProvider.deleteProduct(product.id);
 
               if (mounted) {
@@ -186,176 +184,168 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<VendorProvider>(
-      builder: (context, vendorProvider, child) {
-        final searchQuery = _normalizeSearch(_searchController.text);
-        final shouldBypassFilters =
-            searchQuery.isEmpty && _selectedCategory == 'All';
+    final vendorProvider = ref.watch(vendorProviderProvider);
+    final searchQuery = _normalizeSearch(_searchController.text);
+    final shouldBypassFilters =
+        searchQuery.isEmpty && _selectedCategory == 'All';
 
-        final filteredProducts = shouldBypassFilters
-            ? vendorProvider.products
-            : vendorProvider.products.where((product) {
-                final name = product.name.toString().toLowerCase();
-                final description = product.description
-                    .toString()
-                    .toLowerCase();
-                final category = product.category.toString();
-                final normalizedCategory = _normalizeCategory(category);
-                final searchableText = _normalizeSearch(
-                  '$name $description $normalizedCategory',
-                );
+    final filteredProducts = shouldBypassFilters
+        ? vendorProvider.products
+        : vendorProvider.products.where((product) {
+            final name = product.name.toString().toLowerCase();
+            final description = product.description.toString().toLowerCase();
+            final category = product.category.toString();
+            final normalizedCategory = _normalizeCategory(category);
+            final searchableText = _normalizeSearch(
+              '$name $description $normalizedCategory',
+            );
 
-                final matchesSearch =
-                    searchQuery.isEmpty || searchableText.contains(searchQuery);
+            final matchesSearch =
+                searchQuery.isEmpty || searchableText.contains(searchQuery);
 
-                final matchesCategory =
-                    _selectedCategory == 'All' ||
-                    _matchesCategory(category, _selectedCategory);
+            final matchesCategory =
+                _selectedCategory == 'All' ||
+                _matchesCategory(category, _selectedCategory);
 
-                return matchesSearch && matchesCategory;
-              }).toList();
+            return matchesSearch && matchesCategory;
+          }).toList();
 
-        return Scaffold(
-          backgroundColor: AppTheme.background,
-          appBar: AppBar(
-            backgroundColor: AppTheme.surface,
-            elevation: 0,
-            foregroundColor: AppTheme.textPrimary,
-            toolbarHeight: 10,
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: _showAddProductDialog,
-            backgroundColor: AppTheme.primary,
-            foregroundColor: Colors.white,
-            child: const Icon(Icons.add),
-          ),
-          body: Column(
-            children: [
-              // Search and Filter
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search products...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _searchController.text.trim().isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: () => _searchController.clear(),
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.primary),
-                        ),
-                      ),
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        foregroundColor: AppTheme.textPrimary,
+        toolbarHeight: 10,
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddProductDialog,
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
+      ),
+      body: Column(
+        children: [
+          // Search and Filter
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search products...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.trim().isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => _searchController.clear(),
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
-                    const SizedBox(height: 12),
-                    // Category Filter
-                    SizedBox(
-                      height: 40,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children:
-                            [
-                              'All',
-                              'Snacks',
-                              'Beverages',
-                              'South Indian',
-                              'North Indian',
-                              'Chinese',
-                              'Desserts',
-                            ].map((category) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text(category),
-                                  selected: _selectedCategory == category,
-                                  onSelected: (selected) {
-                                    setState(() {
-                                      _selectedCategory = selected
-                                          ? category
-                                          : 'All';
-                                    });
-                                  },
-                                  backgroundColor: Colors.white,
-                                  selectedColor: AppTheme.primary,
-                                ),
-                              );
-                            }).toList(),
-                      ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primary),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              // Products List
-              Expanded(
-                child: vendorProvider.isLoadingProducts
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppTheme.primary,
-                        ),
-                      )
-                    : filteredProducts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inventory_2_outlined,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              vendorProvider.products.isNotEmpty
-                                  ? 'No matching products'
-                                  : 'No products found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              vendorProvider.products.isNotEmpty
-                                  ? 'Try clearing search or selecting All category'
-                                  : 'Tap the + button to add your first product',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: filteredProducts.length,
-                        itemBuilder: (context, index) {
-                          return ProductCard(
-                            product: filteredProducts[index],
-                            onEdit: () =>
-                                _showEditProductDialog(filteredProducts[index]),
-                            onDelete: () => _showDeleteConfirmDialog(
-                              filteredProducts[index],
+                const SizedBox(height: 12),
+                // Category Filter
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children:
+                        [
+                          'All',
+                          'Snacks',
+                          'Beverages',
+                          'South Indian',
+                          'North Indian',
+                          'Chinese',
+                          'Desserts',
+                        ].map((category) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(category),
+                              selected: _selectedCategory == category,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _selectedCategory = selected
+                                      ? category
+                                      : 'All';
+                                });
+                              },
+                              backgroundColor: Colors.white,
+                              selectedColor: AppTheme.primary,
                             ),
                           );
-                        },
-                      ),
-              ),
-            ],
+                        }).toList(),
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+          // Products List
+          Expanded(
+            child: vendorProvider.isLoadingProducts
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary),
+                  )
+                : filteredProducts.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          vendorProvider.products.isNotEmpty
+                              ? 'No matching products'
+                              : 'No products found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          vendorProvider.products.isNotEmpty
+                              ? 'Try clearing search or selecting All category'
+                              : 'Tap the + button to add your first product',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filteredProducts.length,
+                    itemBuilder: (context, index) {
+                      return ProductCard(
+                        product: filteredProducts[index],
+                        onEdit: () =>
+                            _showEditProductDialog(filteredProducts[index]),
+                        onDelete: () =>
+                            _showDeleteConfirmDialog(filteredProducts[index]),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -601,16 +591,16 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-class AddProductDialog extends StatefulWidget {
+class AddProductDialog extends ConsumerStatefulWidget {
   final dynamic product; // null for add, non-null for edit
 
   const AddProductDialog({super.key, this.product});
 
   @override
-  State<AddProductDialog> createState() => _AddProductDialogState();
+  ConsumerState<AddProductDialog> createState() => _AddProductDialogState();
 }
 
-class _AddProductDialogState extends State<AddProductDialog> {
+class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -878,7 +868,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final vendorProvider = Provider.of<VendorProvider>(context, listen: false);
+    final vendorProvider = ref.read(vendorProviderProvider);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 

@@ -69,6 +69,7 @@ dependencies:
   version: ^3.0.2
   flutter_image_compress: ^2.4.0
   meta: ^1.15.0
+  logging: ^1.2.0
 
 dev_dependencies:
   flutter_test:

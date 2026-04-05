@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/vendor_api_service.dart';
 import '../state/vendor_provider.dart';
@@ -39,14 +39,15 @@ import 'vendor_notifications_screen.dart';
 // Note: This is the legacy dashboard. New vendor app uses dashboard_screen.dart
 // =============================================================================
 
-class VendorDashboardScreen extends StatefulWidget {
+class VendorDashboardScreen extends ConsumerStatefulWidget {
   const VendorDashboardScreen({super.key});
 
   @override
-  State<VendorDashboardScreen> createState() => _VendorDashboardScreenState();
+  ConsumerState<VendorDashboardScreen> createState() =>
+      _VendorDashboardScreenState();
 }
 
-class _VendorDashboardScreenState extends State<VendorDashboardScreen>
+class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
   bool _hasUnreadNotifications = false;
@@ -179,7 +180,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
-    final vendorProvider = Provider.of<VendorProvider>(context);
+    final vendorProvider = ref.read(vendorProviderProvider);
 
     return AppBar(
       backgroundColor: AppTheme.surface,
@@ -356,89 +357,88 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   }
 
   Widget _buildOverviewTab(BuildContext context) {
-    return Consumer<VendorProvider>(
-      builder: (context, vendorProvider, child) => RefreshIndicator(
-        onRefresh: () async {
-          await vendorProvider.refreshData();
-          await _loadUnreadNotificationStatus(force: true);
-        },
-        color: AppTheme.primary,
-        backgroundColor: AppTheme.surface,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isSmallScreen = constraints.maxWidth < 600;
+    final vendorProvider = ref.watch(vendorProviderProvider);
+    return RefreshIndicator(
+      onRefresh: () async {
+        await vendorProvider.refreshData();
+        await _loadUnreadNotificationStatus(force: true);
+      },
+      color: AppTheme.primary,
+      backgroundColor: AppTheme.surface,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isSmallScreen = constraints.maxWidth < 600;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Quick Stats
-                  QuickStatsWidget(vendorProvider: vendorProvider),
-                  const SizedBox(height: 16),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Quick Stats
+                QuickStatsWidget(vendorProvider: vendorProvider),
+                const SizedBox(height: 16),
 
-                  // Revenue Chart
-                  RevenueChartWidget(vendorProvider: vendorProvider),
-                  const SizedBox(height: 20),
+                // Revenue Chart
+                RevenueChartWidget(vendorProvider: vendorProvider),
+                const SizedBox(height: 20),
 
-                  // Recent Orders
-                  RecentOrdersWidget(
-                    vendorProvider: vendorProvider,
-                    onViewAll: () {
-                      _goToTab(1);
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSettlementSection(vendorProvider, isSmallScreen),
-                  const SizedBox(height: 20),
+                // Recent Orders
+                RecentOrdersWidget(
+                  vendorProvider: vendorProvider,
+                  onViewAll: () {
+                    _goToTab(1);
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildSettlementSection(vendorProvider, isSmallScreen),
+                const SizedBox(height: 20),
 
-                  // Analytics Cards - Responsive layout
-                  isSmallScreen
-                      ? Column(
-                          children: [
-                            AnalyticsCard(
+                // Analytics Cards - Responsive layout
+                isSmallScreen
+                    ? Column(
+                        children: [
+                          AnalyticsCard(
+                            title: 'Total Revenue',
+                            value:
+                                '₹${(vendorProvider.earnings['total'] ?? 0).toStringAsFixed(2)}',
+                            icon: Icons.attach_money,
+                            color: AppTheme.primary,
+                          ),
+                          const SizedBox(height: 12),
+                          AnalyticsCard(
+                            title: 'Total Orders',
+                            value: '${vendorProvider.orders.length}',
+                            icon: Icons.shopping_bag,
+                            color: AppTheme.primary,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: AnalyticsCard(
                               title: 'Total Revenue',
                               value:
                                   '₹${(vendorProvider.earnings['total'] ?? 0).toStringAsFixed(2)}',
                               icon: Icons.attach_money,
                               color: AppTheme.primary,
                             ),
-                            const SizedBox(height: 12),
-                            AnalyticsCard(
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: AnalyticsCard(
                               title: 'Total Orders',
                               value: '${vendorProvider.orders.length}',
                               icon: Icons.shopping_bag,
                               color: AppTheme.primary,
                             ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(
-                              child: AnalyticsCard(
-                                title: 'Total Revenue',
-                                value:
-                                    '₹${(vendorProvider.earnings['total'] ?? 0).toStringAsFixed(2)}',
-                                icon: Icons.attach_money,
-                                color: AppTheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: AnalyticsCard(
-                                title: 'Total Orders',
-                                value: '${vendorProvider.orders.length}',
-                                icon: Icons.shopping_bag,
-                                color: AppTheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                ],
-              );
-            },
-          ),
+                          ),
+                        ],
+                      ),
+              ],
+            );
+          },
         ),
       ),
     );

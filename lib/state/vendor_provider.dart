@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_endpoints.dart';
 import '../models/vendor_models.dart';
@@ -1085,3 +1086,8 @@ class VendorProvider extends ChangeNotifier {
     }
   }
 }
+
+// Riverpod provider for VendorProvider
+final vendorProviderProvider = ChangeNotifierProvider<VendorProvider>((ref) {
+  return VendorProvider();
+});

@@ -34,6 +34,8 @@ final productData = {
 };
 
 // Image files to upload
+import '../utils/logger.dart';
+
 final imageFiles = [
   File('/path/to/image1.jpg'),
   File('/path/to/image2.png'),
@@ -48,9 +50,9 @@ final success = await vendorProvider.updateProduct(
 );
 
 if (success) {
-  print('✅ Product updated with images!');
+  Logger().info('✅ Product updated with images!');
 } else {
-  print('❌ Update failed: ${vendorProvider.error}');
+  Logger().error('❌ Update failed: ${vendorProvider.error}');
 }
 ```
 

@@ -128,6 +128,8 @@ Consumer(
 
 ### 3. Advanced Usage with Real-time
 ```dart
+import '../utils/logger.dart';
+
 // Initialize enhanced service
 await EnhancedNotificationService.initialize();
 
@@ -138,7 +140,7 @@ EnhancedNotificationService.notificationStream.listen((notification) {
 
 // Check service status
 final status = EnhancedNotificationService.getStatus();
-print('Using: ${status['service']}');
+Logger().info('Using: ${status['service']}');
 ```
 
 ## 🎯 KEY FEATURES

@@ -55,7 +55,15 @@ class BackgroundNotificationService {
             >();
 
     if (androidImplementation != null) {
-      await androidImplementation.requestNotificationsPermission();
+      try {
+        // Try to request permissions - this will only work on Android 13+
+        await androidImplementation.requestNotificationsPermission();
+      } catch (e) {
+        // For Android 12 and below, permissions are granted at install time
+        debugPrint(
+          'Notification permissions handled at install time (Android < 13): $e',
+        );
+      }
     }
   }
 
