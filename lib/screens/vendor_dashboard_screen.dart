@@ -14,8 +14,8 @@ import '../widgets/revenue_chart_widget.dart';
 import 'orders_screen.dart';
 import 'products_screen.dart';
 import 'analytics_screen.dart';
-import 'profile_screen.dart';
-import 'notification_screen.dart';
+import 'vendor_profile_screen.dart';
+import 'vendor_notifications_screen.dart';
 
 // =============================================================================
 // VENDOR DASHBOARD SCREEN (LEGACY)
@@ -166,13 +166,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       case 0:
         return const _OverviewTabHost();
       case 1:
-        return const OrdersScreen();
+        return const VendorOrdersTab();
       case 2:
         return const ProductsScreen();
       case 3:
         return const AnalyticsScreen();
       case 4:
-        return const ProfileScreen();
+        return const VendorProfileTab();
       default:
         return const SizedBox.shrink();
     }
@@ -216,7 +216,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const NotificationScreen(),
+                    builder: (context) => const VendorNotificationsScreen(),
                   ),
                 );
                 await _loadUnreadNotificationStatus(force: true);

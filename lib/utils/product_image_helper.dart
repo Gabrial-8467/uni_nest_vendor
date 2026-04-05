@@ -25,9 +25,7 @@ class ProductImageHelper {
 
   static bool _isLoopbackHost(String host) {
     final normalized = host.trim().toLowerCase();
-    return normalized == 'localhost' ||
-        normalized == '127.0.0.1' ||
-        normalized == '::1';
+    return normalized == '::1';
   }
 
   static bool _isVersionedCloudinaryUrl(Uri uri) {
@@ -35,10 +33,7 @@ class ProductImageHelper {
         RegExp(r'/upload/v\\d+/').hasMatch(uri.path);
   }
 
-  static String resolveImageUrl(
-    String rawPath, {
-    String? apiBaseUrl,
-  }) {
+  static String resolveImageUrl(String rawPath, {String? apiBaseUrl}) {
     final effectiveApiBaseUrl = apiBaseUrl ?? VendorConfig.apiBaseUrl;
     final path = normalizeImagePath(rawPath);
     if (path.isEmpty) {
@@ -108,7 +103,8 @@ class ProductImageHelper {
       return resolved;
     }
 
-    if (_isVersionedCloudinaryUrl(uri) && !uri.queryParameters.containsKey('v')) {
+    if (_isVersionedCloudinaryUrl(uri) &&
+        !uri.queryParameters.containsKey('v')) {
       return resolved;
     }
 

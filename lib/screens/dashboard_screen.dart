@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../../utils/app_theme.dart';
-import '../core/vendor_formatters.dart';
-import '../models/order_models.dart';
-import '../providers/auth_provider.dart';
-import '../providers/ledger_provider.dart';
-import '../providers/order_provider.dart';
-import '../providers/payout_provider.dart';
-import '../widgets/empty_state.dart';
-import '../widgets/order_list_card.dart';
-import '../widgets/summary_tile.dart';
+import '../../core/vendor_formatters.dart';
+import '../../models/order_models.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/ledger_provider.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/payout_provider.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/order_list_card.dart';
+import '../../widgets/summary_tile.dart';
 import 'order_details_screen.dart';
 
 class VendorDashboardTab extends ConsumerWidget {

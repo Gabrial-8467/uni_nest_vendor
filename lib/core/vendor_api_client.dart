@@ -80,6 +80,15 @@ class VendorApiClient {
     return session;
   }
 
+  Future<void> forgotPassword({required String email}) async {
+    await _request(
+      method: 'POST',
+      path: '/auth/forgot-password',
+      requiresAuth: false,
+      body: {'email': email},
+    );
+  }
+
   Future<AuthSession> register({
     required String name,
     required String email,
@@ -114,7 +123,11 @@ class VendorApiClient {
   }
 
   Future<VendorProfile> updateProfile(Map<String, dynamic> body) async {
-    final response = await _request(method: 'PUT', path: '/profile', body: body);
+    final response = await _request(
+      method: 'PUT',
+      path: '/profile',
+      body: body,
+    );
     final data = response['data'];
     if (data is Map<String, dynamic> && data.isNotEmpty) {
       return VendorProfile.fromJson(data);

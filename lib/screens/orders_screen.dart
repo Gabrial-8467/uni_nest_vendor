@@ -1,62 +1,85 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../state/vendor_provider.dart';
-import '../utils/app_theme.dart';
-import '../widgets/order_card.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+import '../../utils/app_theme.dart';
+import '../models/order_models.dart';
+import '../providers/order_provider.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/order_list_card.dart';
+import 'order_details_screen.dart';
+
+class VendorOrdersTab extends ConsumerStatefulWidget {
+  const VendorOrdersTab({super.key});
 
   @override
-  State<OrdersScreen> createState() => _OrdersScreenState();
+  ConsumerState<VendorOrdersTab> createState() => _VendorOrdersTabState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen>
+class _VendorOrdersTabState extends ConsumerState<VendorOrdersTab>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  late final TabController _controller;
   final TextEditingController _searchController = TextEditingController();
+  static const _key = ValueKey('orders_tab_v2');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _controller = TabController(length: 6, vsync: this);
+    _controller.addListener(() {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _controller.removeListener(() {});
+    _controller.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<VendorProvider>(
-      builder: (context, vendorProvider, child) {
-        return Scaffold(
-          backgroundColor: AppTheme.background,
-          appBar: AppBar(
-            backgroundColor: AppTheme.surface,
-            elevation: 0,
-            foregroundColor: AppTheme.textPrimary,
-            toolbarHeight: 10,
-          ),
-          body: Column(
-            children: [
-              // Search and Filter Section
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Row(
+    final orderState = ref.watch(orderProvider);
+    final filtered = _filter(orderState.orders);
+    final newCount = filtered
+        .where(
+          (order) => order.status == 'pending' || order.status == 'confirmed',
+        )
+        .length;
+    final preparingCount = filtered
+        .where((order) => order.status == 'preparing')
+        .length;
+    final readyCount = filtered
+        .where((order) => order.status == 'ready')
+        .length;
+    final deliveryCount = filtered
+        .where((order) => order.status == 'out_for_delivery')
+        .length;
+
+    return Scaffold(
+      key: _key,
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        foregroundColor: AppTheme.textPrimary,
+        toolbarHeight: 8,
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    // Search Bar
                     Expanded(
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Search orders by ID, customer...',
+                          hintText: 'Search orders by ID, customer, phone...',
                           prefixIcon: const Icon(Icons.search_outlined),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
@@ -69,234 +92,227 @@ class _OrdersScreenState extends State<OrdersScreen>
                               : null,
                           filled: true,
                           fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.grey[300]!,
-                              width: 1.5,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.grey[300]!,
-                              width: 1.5,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: AppTheme.primary,
-                              width: 2,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
                         ),
-                        onChanged: (value) {
-                          setState(() {});
-                        },
+                        onChanged: (_) => setState(() {}),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    // Filter Button
-                    Container(
-                      decoration: BoxDecoration(
+                  ],
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 92,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _QueueChip(
+                        label: 'New',
+                        count: newCount,
+                        icon: Icons.receipt_long_outlined,
                         color: AppTheme.primary,
-                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: IconButton(
-                        onPressed: () {
-                          _showFilterDialog(context);
-                        },
-                        icon: const Icon(
-                          Icons.filter_list_outlined,
-                          color: Colors.white,
-                        ),
+                      _QueueChip(
+                        label: 'Preparing',
+                        count: preparingCount,
+                        icon: Icons.restaurant_outlined,
+                        color: const Color(0xFF8B5CF6),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Tabs
-              Container(
-                color: AppTheme.surface,
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: AppTheme.primary,
-                  unselectedLabelColor: Colors.grey[600],
-                  indicatorColor: AppTheme.primary,
-                  indicatorWeight: 3,
-                  isScrollable: true,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                      _QueueChip(
+                        label: 'Ready',
+                        count: readyCount,
+                        icon: Icons.inventory_2_outlined,
+                        color: const Color(0xFF10B981),
+                      ),
+                      _QueueChip(
+                        label: 'Delivery',
+                        count: deliveryCount,
+                        icon: Icons.local_shipping_outlined,
+                        color: const Color(0xFF6366F1),
+                      ),
+                    ],
                   ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  tabs: const [
-                    Tab(text: 'All'),
-                    Tab(text: 'Pending'),
-                    Tab(text: 'Confirmed'),
-                    Tab(text: 'Preparing'),
-                    Tab(text: 'Completed'),
-                  ],
                 ),
-              ),
-
-              // Orders List
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildOrdersList(
-                      _getFilteredOrders(vendorProvider.orders),
-                      'All',
-                    ),
-                    _buildOrdersList(
-                      _getFilteredOrders(
-                        vendorProvider.getOrdersByStatus('pending'),
-                      ),
-                      'Pending',
-                    ),
-                    _buildOrdersList(
-                      _getFilteredOrders(
-                        vendorProvider.getOrdersByStatus('confirmed'),
-                      ),
-                      'Confirmed',
-                    ),
-                    _buildOrdersList(
-                      _getFilteredOrders(
-                        vendorProvider.getOrdersByStatus('preparing'),
-                      ),
-                      'Preparing',
-                    ),
-                    _buildOrdersList(
-                      _getFilteredOrders(
-                        vendorProvider.getOrdersByStatus('delivered'),
-                      ),
-                      'Completed',
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
-      },
-    );
-  }
-
-  List _getFilteredOrders(List orders) {
-    if (_searchController.text.isEmpty) {
-      return orders;
-    }
-
-    final searchQuery = _searchController.text.toLowerCase();
-    return orders.where((order) {
-      return order.id.toLowerCase().contains(searchQuery) ||
-          order.customerName.toLowerCase().contains(searchQuery) ||
-          order.customerPhone.toLowerCase().contains(searchQuery);
-    }).toList();
-  }
-
-  void _showFilterDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Orders'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Date Range'),
-              leading: const Icon(Icons.date_range_outlined),
-              onTap: () {
-                Navigator.pop(context);
-                // Show date range picker
-              },
+          Container(
+            color: AppTheme.surface,
+            child: TabBar(
+              controller: _controller,
+              labelColor: AppTheme.primary,
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: AppTheme.primary,
+              indicatorWeight: 3,
+              isScrollable: true,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+              tabs: const [
+                Tab(text: 'New'),
+                Tab(text: 'Preparing'),
+                Tab(text: 'Ready'),
+                Tab(text: 'Out for delivery'),
+                Tab(text: 'Completed'),
+                Tab(text: 'Cancelled'),
+              ],
             ),
-            ListTile(
-              title: const Text('Order Status'),
-              leading: const Icon(Icons.filter_list_outlined),
-              onTap: () {
-                Navigator.pop(context);
-                // Show status filter
-              },
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _controller,
+              children: [
+                _OrderListView(
+                  orders: filtered
+                      .where(
+                        (order) =>
+                            order.status == 'pending' ||
+                            order.status == 'confirmed',
+                      )
+                      .toList(),
+                ),
+                _OrderListView(orders: _ordersByStatus(filtered, 'preparing')),
+                _OrderListView(orders: _ordersByStatus(filtered, 'ready')),
+                _OrderListView(
+                  orders: _ordersByStatus(filtered, 'out_for_delivery'),
+                ),
+                _OrderListView(orders: _ordersByStatus(filtered, 'delivered')),
+                _OrderListView(
+                  orders: filtered
+                      .where((order) => order.status == 'cancelled')
+                      .toList(),
+                ),
+              ],
             ),
-            ListTile(
-              title: const Text('Amount Range'),
-              leading: const Icon(Icons.attach_money_outlined),
-              onTap: () {
-                Navigator.pop(context);
-                // Show amount filter
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOrdersList(List orders, String category) {
-    if (orders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.inbox_outlined,
-                size: 64,
-                color: AppTheme.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No $category orders',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Orders will appear here when customers place them',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
+  List<VendorOrder> _filter(List<VendorOrder> orders) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return orders;
     }
+    return orders.where((order) {
+      return order.orderNumber.toLowerCase().contains(query) ||
+          order.customerName.toLowerCase().contains(query) ||
+          order.customerPhone.toLowerCase().contains(query);
+    }).toList();
+  }
 
+  List<VendorOrder> _ordersByStatus(List<VendorOrder> orders, String status) {
+    return orders.where((order) => order.status == status).toList();
+  }
+}
+
+class _OrderListView extends ConsumerWidget {
+  const _OrderListView({required this.orders});
+
+  final List<VendorOrder> orders;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return RefreshIndicator(
-      onRefresh: () async {
-        // Refresh orders
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: orders.length,
-        itemBuilder: (context, index) {
-          return OrderCard(order: orders[index]);
-        },
+      onRefresh: () => ref.read(orderProvider.notifier).loadOrders(),
+      child: orders.isEmpty
+          ? ListView(
+              children: const [
+                SizedBox(height: 120),
+                EmptyState(
+                  icon: Icons.inbox_outlined,
+                  title: 'No orders here',
+                  message:
+                      'Orders for this stage will appear once they are moved into this queue.',
+                ),
+              ],
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: orders.length,
+              itemBuilder: (context, index) {
+                final order = orders[index];
+                return OrderListCard(
+                  order: order,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailsScreen(orderId: order.id),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+    );
+  }
+}
+
+class _QueueChip extends StatelessWidget {
+  const _QueueChip({
+    required this.label,
+    required this.count,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 126,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3436),
+            ),
+          ),
+        ],
       ),
     );
   }

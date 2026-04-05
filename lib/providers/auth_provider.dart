@@ -175,6 +175,18 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> forgotPassword({required String email}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _apiClient.forgotPassword(email: email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _apiClient.clearSession();
     state = const AuthState(didBootstrap: true);

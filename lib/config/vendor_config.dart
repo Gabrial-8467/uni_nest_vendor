@@ -22,21 +22,31 @@ class VendorConfig {
   // API Configuration
   static String get apiBaseUrl {
     final envUrl = dotenv.env['VENDOR_API_BASE_URL'];
-    final rawUrl =
-        (envUrl != null && envUrl.isNotEmpty)
-        ? envUrl
-        : EnvironmentConfig.apiBaseUrl;
-
-    // Android emulators cannot reach host machine via localhost/127.0.0.1.
-    if (!kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.android &&
-        (rawUrl.contains('://localhost') || rawUrl.contains('://127.0.0.1'))) {
-      return rawUrl
-          .replaceFirst('://localhost', '://10.0.2.2')
-          .replaceFirst('://127.0.0.1', '://10.0.2.2');
+    if (envUrl != null && envUrl.isNotEmpty) {
+      return envUrl;
     }
 
-    return rawUrl;
+    // Fallback to environment variable or production URL
+    final envVarUrl = String.fromEnvironment('API_BASE_URL');
+    if (envVarUrl.isNotEmpty) {
+      return envVarUrl;
+    }
+
+    // Production fallback
+    return 'https://uninest-backend.onrender.com/api/vendor';
+  }
+
+  // Debug method to check current API URL
+  static void debugApiUrl() {
+    if (isDebugMode) {
+      debugPrint('🔗 API URL being used: $apiBaseUrl');
+      debugPrint(
+        '📁 .env VENDOR_API_BASE_URL: ${dotenv.env['VENDOR_API_BASE_URL']}',
+      );
+      debugPrint(
+        '🏗️ Environment API_BASE_URL: ${String.fromEnvironment('API_BASE_URL')}',
+      );
+    }
   }
 
   // Network Configuration
@@ -253,16 +263,6 @@ class VendorConfig {
     // Enforce HTTPS in production if enabled
     if (enforceHttps && url.startsWith('http://')) {
       url = url.replaceFirst('http://', 'https://');
-    }
-
-    if (isDebugMode &&
-        (url.contains('localhost') || url.contains('127.0.0.1'))) {
-      debugPrint(
-        '⚠️ WARNING: Using localhost/127.0.0.1. This won\'t work on physical devices!',
-      );
-      debugPrint(
-        'Please change to your computer\'s local IP address (e.g., 192.168.1.x)',
-      );
     }
 
     return url;

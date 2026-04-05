@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/app_theme.dart';
+import '../utils/app_theme.dart';
 import '../core/vendor_formatters.dart';
 
 class StatusChip extends StatelessWidget {

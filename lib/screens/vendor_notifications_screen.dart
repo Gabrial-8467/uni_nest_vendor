@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../utils/app_theme.dart';
-import '../core/vendor_formatters.dart';
-import '../models/ledger_models.dart';
-import '../providers/notification_provider.dart';
-import '../widgets/empty_state.dart';
+import '../../core/vendor_formatters.dart';
+import '../../models/ledger_models.dart';
+import '../../providers/notification_provider.dart';
+import '../../widgets/empty_state.dart';
 
 class VendorNotificationsScreen extends ConsumerStatefulWidget {
   const VendorNotificationsScreen({super.key});
@@ -292,7 +292,7 @@ class _NotificationCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              notification.title,
+                              notification.body,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,

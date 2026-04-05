@@ -46,9 +46,9 @@ import 'utils/app_theme.dart';
 import 'utils/connectivity_service.dart';
 import 'utils/logger.dart';
 import 'utils/performance_optimizer.dart';
-import 'vendor_app/screens/auth_gate_screen.dart';
-import 'vendor_app/screens/vendor_signup_screen.dart';
-import 'vendor_app/screens/vendor_shell_screen.dart';
+import 'screens/auth_gate_screen.dart';
+import 'screens/vendor_signup_screen.dart';
+import 'screens/vendor_shell_screen.dart';
 import 'widgets/permission_request_widget.dart';
 
 void main() async {
@@ -56,6 +56,7 @@ void main() async {
 
   try {
     await VendorConfig.initialize();
+    VendorConfig.debugApiUrl(); // Debug API URL
     await _initializeServices();
   } catch (e) {
     debugPrint('Failed to initialize app: $e');
