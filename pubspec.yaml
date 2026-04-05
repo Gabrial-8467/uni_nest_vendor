@@ -61,6 +61,7 @@ dependencies:
   
   # Local Notifications
   flutter_local_notifications: ^17.2.2
+  workmanager: ^0.5.2
   
   # Utilities
   uuid: ^4.4.0

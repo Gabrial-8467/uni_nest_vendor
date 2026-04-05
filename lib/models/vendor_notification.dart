@@ -15,22 +15,22 @@ class VendorNotification {
 
   /// Notification ID from backend
   final String id;
-  
+
   /// Notification title
   final String title;
-  
+
   /// Notification message (mapped from backend "message" field)
   final String body;
-  
-  /// Notification type: "order" | "payment" | "system" | "promotion"
+
+  /// Notification type: "order" | "payment" | "system" | "promotion" | "vendor_approval" | "vendor_status"
   final String type;
-  
+
   /// Read status from backend
   final bool isRead;
-  
+
   /// Creation timestamp (parsed from ISO string)
   final DateTime createdAt;
-  
+
   /// Optional metadata for additional context
   final Map<String, dynamic>? data;
 
@@ -64,9 +64,9 @@ class VendorNotification {
   /// Parses DateTime from various possible backend formats
   static DateTime _parseDateTime(dynamic dateTimeValue) {
     if (dateTimeValue == null) return DateTime.now();
-    
+
     if (dateTimeValue is DateTime) return dateTimeValue;
-    
+
     if (dateTimeValue is String) {
       try {
         // Try ISO 8601 format first
@@ -77,12 +77,14 @@ class VendorNotification {
           // Fallback to other common formats
           return DateTime.tryParse(dateTimeValue) ?? DateTime.now();
         } catch (e2) {
-          debugPrint('Failed to parse date completely: $dateTimeValue, error: $e2');
+          debugPrint(
+            'Failed to parse date completely: $dateTimeValue, error: $e2',
+          );
           return DateTime.now();
         }
       }
     }
-    
+
     return DateTime.now();
   }
 
@@ -142,15 +144,21 @@ class VendorNotification {
 
   /// Check if notification is of order type
   bool get isOrder => type == 'order';
-  
+
   /// Check if notification is of payment type
   bool get isPayment => type == 'payment';
-  
+
   /// Check if notification is of system type
   bool get isSystem => type == 'system';
-  
+
   /// Check if notification is of promotion type
   bool get isPromotion => type == 'promotion';
+
+  /// Check if notification is of vendor approval type
+  bool get isVendorApproval => type == 'vendor_approval';
+
+  /// Check if notification is of vendor status type
+  bool get isVendorStatus => type == 'vendor_status';
 
   @override
   bool operator ==(Object other) {

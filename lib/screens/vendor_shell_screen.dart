@@ -201,7 +201,7 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
                   ),
                 ),
               ),
-              if (notifications.notifications.isNotEmpty)
+              if (notifications.unreadCount > 0)
                 Positioned(
                   right: 20,
                   top: 8,
@@ -217,9 +217,9 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
                       minHeight: 18,
                     ),
                     child: Text(
-                      notifications.notifications.length > 99
+                      notifications.unreadCount > 99
                           ? '99+'
-                          : notifications.notifications.length.toString(),
+                          : notifications.unreadCount.toString(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,

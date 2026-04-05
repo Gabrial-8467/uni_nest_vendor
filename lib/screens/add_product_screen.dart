@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 import '../services/image_upload_service.dart';
+import '../services/permission_service.dart';
 import '../utils/secure_logger.dart';
 
 class AddProductScreen extends ConsumerStatefulWidget {
@@ -66,6 +68,42 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      debugPrint('📸 Starting image pick from source: $source');
+
+      // Request permissions first
+      bool hasPermission = false;
+
+      if (source == ImageSource.camera) {
+        debugPrint('📷 Requesting camera permission...');
+        hasPermission = await PermissionService.requestPermission(
+          Permission.camera,
+        );
+      } else {
+        debugPrint('📁 Requesting storage permission...');
+        hasPermission = await PermissionService.requestPermission(
+          Permission.storage,
+        );
+      }
+
+      debugPrint('🔐 Permission granted: $hasPermission');
+
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                source == ImageSource.camera
+                    ? 'Camera permission is required to take photos'
+                    : 'Storage permission is required to select images',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      debugPrint('🖼️ Opening image picker...');
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 90,
@@ -73,11 +111,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         maxHeight: 1200,
       );
 
+      debugPrint('📷 Image picked: ${image != null ? 'YES' : 'NO'}');
+
       if (image != null && mounted) {
         final imageFile = File(image.path);
+        debugPrint('📁 Image file path: ${imageFile.path}');
 
         // Validate and optimize the image
         if (!ImageUploadService.isValidImageFile(imageFile)) {
+          debugPrint('❌ Invalid image file format');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -94,8 +136,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         setState(() {
           _productImageFiles.add(imageFile);
         });
+
+        debugPrint(
+          '✅ Image added successfully. Total images: ${_productImageFiles.length}',
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Image added successfully (${_productImageFiles.length} total)',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
+      debugPrint('❌ Error picking image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -518,6 +518,27 @@ class VendorNotificationScreen extends ConsumerWidget {
           MaterialPageRoute(builder: (context) => const PromotionsScreen()),
         );
         break;
+      case 'vendor_approval':
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🎉 Congratulations! Your vendor account has been approved.',
+            ),
+            backgroundColor: Colors.teal,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        break;
+      case 'vendor_status':
+        final status = notification.data?['status']?.toString() ?? 'updated';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Your vendor account status has been $status.'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        break;
     }
   }
 
@@ -532,6 +553,10 @@ class VendorNotificationScreen extends ConsumerWidget {
         return Icons.info_outline;
       case 'promotion':
         return Icons.campaign_outlined;
+      case 'vendor_approval':
+        return Icons.verified_outlined;
+      case 'vendor_status':
+        return Icons.admin_panel_settings_outlined;
       default:
         return Icons.notifications_outlined;
     }
@@ -548,6 +573,10 @@ class VendorNotificationScreen extends ConsumerWidget {
         return Colors.orange;
       case 'promotion':
         return Colors.purple;
+      case 'vendor_approval':
+        return Colors.teal;
+      case 'vendor_status':
+        return Colors.redAccent;
       default:
         return Colors.grey;
     }
