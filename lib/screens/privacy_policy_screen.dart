@@ -1,6 +1,28 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
+// =============================================================================
+// PRIVACY POLICY SCREEN
+// =============================================================================
+//
+// Purpose: Display comprehensive privacy policy for vendor app users
+// Features:
+// - Clear privacy policy sections
+// - Data collection information
+// - Usage and sharing policies
+// - User rights and options
+// - Contact information for privacy concerns
+//
+// Sections:
+// 1. Policy Header - Title and update information
+// 2. Information Collection - Data we collect and why
+// 3. Data Usage - How collected information is used
+// 4. Data Sharing - When and with whom data is shared
+// 5. User Rights - Privacy rights and choices
+// 6. Security - Data protection measures
+// 7. Contact - Privacy-related contact information
+// =============================================================================
+
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
 

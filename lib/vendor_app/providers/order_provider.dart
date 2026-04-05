@@ -1,0 +1,205 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/order_models.dart';
+import 'auth_provider.dart';
+import 'ledger_provider.dart';
+import 'payout_provider.dart';
+
+class OrderState {
+  const OrderState({
+    this.isLoading = false,
+    this.orders = const [],
+    this.errorMessage,
+    this.lastUpdatedAt,
+    this.activeOrderIds = const <String>{},
+  });
+
+  final bool isLoading;
+  final List<VendorOrder> orders;
+  final String? errorMessage;
+  final DateTime? lastUpdatedAt;
+  final Set<String> activeOrderIds;
+
+  OrderState copyWith({
+    bool? isLoading,
+    List<VendorOrder>? orders,
+    String? errorMessage,
+    bool clearError = false,
+    DateTime? lastUpdatedAt,
+    Set<String>? activeOrderIds,
+  }) {
+    return OrderState(
+      isLoading: isLoading ?? this.isLoading,
+      orders: orders ?? this.orders,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
+      activeOrderIds: activeOrderIds ?? this.activeOrderIds,
+    );
+  }
+}
+
+class OrderController extends StateNotifier<OrderState> {
+  OrderController(this._ref) : super(const OrderState());
+
+  final Ref _ref;
+  Timer? _pollingTimer;
+  bool _isFetching = false;
+
+  Future<void> loadOrders({bool silent = false}) async {
+    if (!_ref.read(authProvider).isAuthenticated) {
+      state = const OrderState();
+      return;
+    }
+
+    if (_isFetching) {
+      return;
+    }
+    _isFetching = true;
+
+    if (!silent) {
+      state = state.copyWith(isLoading: true, clearError: true);
+    }
+    try {
+      final orders = await _ref.read(vendorApiClientProvider).getVendorOrders();
+      state = state.copyWith(
+        isLoading: false,
+        orders: orders,
+        lastUpdatedAt: DateTime.now(),
+        clearError: true,
+      );
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+    } finally {
+      _isFetching = false;
+    }
+  }
+
+  void startPolling() {
+    _pollingTimer ??= Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => loadOrders(silent: true),
+    );
+  }
+
+  void stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  Future<bool> advanceOrder(VendorOrder order) async {
+    final nextStatus = order.nextStatus;
+    if (nextStatus == null) {
+      return false;
+    }
+    return updateOrderStatus(orderId: order.id, status: nextStatus);
+  }
+
+  Future<bool> updateOrderStatus({
+    required String orderId,
+    required String status,
+    String? note,
+  }) async {
+    return _runOrderAction(
+      orderId,
+      () => _ref
+          .read(vendorApiClientProvider)
+          .updateOrderStatus(orderId: orderId, status: status, note: note),
+    );
+  }
+
+  Future<bool> rejectOrder({
+    required String orderId,
+    required String reason,
+  }) async {
+    return _runOrderAction(
+      orderId,
+      () => _ref
+          .read(vendorApiClientProvider)
+          .rejectOrder(orderId: orderId, reason: reason),
+    );
+  }
+
+  Future<bool> verifyDeliveryOtp({
+    required String orderId,
+    required String otp,
+  }) async {
+    return _runOrderAction(
+      orderId,
+      () => _ref
+          .read(vendorApiClientProvider)
+          .verifyDeliveryOtp(orderId: orderId, otp: otp),
+    );
+  }
+
+  Future<bool> _runOrderAction(
+    String orderId,
+    Future<VendorOrder> Function() action,
+  ) async {
+    final nextActive = {...state.activeOrderIds, orderId};
+    state = state.copyWith(activeOrderIds: nextActive, clearError: true);
+    try {
+      final updatedOrder = await action();
+      final updatedOrders = [
+        for (final order in state.orders)
+          if (order.id == orderId) updatedOrder else order,
+      ];
+      nextActive.remove(orderId);
+      state = state.copyWith(
+        orders: updatedOrders,
+        activeOrderIds: nextActive,
+        lastUpdatedAt: DateTime.now(),
+      );
+      _ref.read(ledgerProvider.notifier).loadLedger(silent: true);
+      _ref.read(payoutProvider.notifier).loadPayouts(silent: true);
+      return true;
+    } catch (error) {
+      nextActive.remove(orderId);
+      state = state.copyWith(
+        activeOrderIds: nextActive,
+        errorMessage: error.toString(),
+      );
+      return false;
+    }
+  }
+
+  @override
+  void dispose() {
+    stopPolling();
+    super.dispose();
+  }
+}
+
+final orderProvider = StateNotifierProvider<OrderController, OrderState>(
+  (ref) => OrderController(ref),
+);
+
+final activeOrdersProvider = Provider<List<VendorOrder>>((ref) {
+  final orders = ref.watch(orderProvider).orders;
+  return orders
+      .where(
+        (order) => [
+          'pending',
+          'confirmed',
+          'preparing',
+          'ready',
+          'out_for_delivery',
+        ].contains(order.status),
+      )
+      .toList();
+});
+
+final completedOrdersProvider = Provider<List<VendorOrder>>((ref) {
+  final orders = ref.watch(orderProvider).orders;
+  return orders.where((order) => order.status == 'delivered').toList();
+});
+
+final cancelledOrdersProvider = Provider<List<VendorOrder>>((ref) {
+  final orders = ref.watch(orderProvider).orders;
+  return orders
+      .where(
+        (order) => order.status == 'cancelled' || order.status == 'refunded',
+      )
+      .toList();
+});

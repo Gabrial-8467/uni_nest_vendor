@@ -4,6 +4,28 @@ import 'package:fl_chart/fl_chart.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 
+// =============================================================================
+// ANALYTICS SCREEN
+// =============================================================================
+//
+// Purpose: Comprehensive analytics and reporting for vendor performance
+// Features:
+// - Revenue analytics with charts
+// - Order trends and patterns
+// - Product performance metrics
+// - Customer insights
+// - Time-based filtering (daily, weekly, monthly)
+// - Export functionality for reports
+//
+// Sections:
+// 1. Analytics Header - Period selection and summary stats
+// 2. Revenue Analytics - Revenue charts and trends
+// 3. Order Analytics - Order volume and status breakdown
+// 4. Product Analytics - Best/worst performing products
+// 5. Customer Analytics - Customer behavior insights
+// 6. Export Options - Report generation and download
+// =============================================================================
+
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
@@ -893,32 +915,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     PieChartData(
                       sectionsSpace: 2,
                       centerSpaceRadius: 60,
-                      sections: sortedCategoryData
-                          .asMap()
-                          .entries
-                          .map((entry) {
-                            final index = entry.key;
-                            final mapEntry = entry.value;
-                            final value = mapEntry.value;
-                            final percentage = totalRevenue > 0
-                                ? (value / totalRevenue * 100)
-                                : 0.0;
-                            final color = colors[index % colors.length];
+                      sections: sortedCategoryData.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final mapEntry = entry.value;
+                        final value = mapEntry.value;
+                        final percentage = totalRevenue > 0
+                            ? (value / totalRevenue * 100)
+                            : 0.0;
+                        final color = colors[index % colors.length];
 
-                            return PieChartSectionData(
-                              color: color,
-                              value: value,
-                              title: '${percentage.toStringAsFixed(1)}%',
-                              radius: 50,
-                              titlePositionPercentageOffset: 0.6,
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            );
-                          })
-                          .toList(),
+                        return PieChartSectionData(
+                          color: color,
+                          value: value,
+                          title: '${percentage.toStringAsFixed(1)}%',
+                          radius: 50,
+                          titlePositionPercentageOffset: 0.6,
+                          titleStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
                 ),
@@ -929,9 +947,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: sortedCategoryData.asMap().entries.map((
-                      entry,
-                    ) {
+                    children: sortedCategoryData.asMap().entries.map((entry) {
                       final index = entry.key;
                       final mapEntry = entry.value;
                       final color = colors[index % colors.length];

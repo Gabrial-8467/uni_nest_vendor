@@ -7,6 +7,27 @@ import 'help_and_support_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
+// =============================================================================
+// PROFILE SCREEN
+// =============================================================================
+//
+// Purpose: Vendor profile management and settings
+// Features:
+// - Business information management
+// - Contact details update
+// - Address and location management
+// - Password change functionality
+// - Notification preferences
+// - Account settings and preferences
+//
+// Sections:
+// 1. Profile State Management - Controllers and form handling
+// 2. UI Components - Profile display and edit forms
+// 3. Location Services - GPS and address management
+// 4. Settings Dialogs - Password and notification settings
+// 5. Form Validation - Input validation and error handling
+// =============================================================================
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -454,8 +475,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader(Vendor? vendor) {
-    final businessName = vendor?.businessName ?? 'Your Business';
-    final businessType = vendor?.businessType ?? 'Business Type';
+    final businessName = (vendor?.businessName ?? '').trim().isNotEmpty
+        ? vendor!.businessName.trim()
+        : (_businessNameController.text.trim().isNotEmpty
+              ? _businessNameController.text.trim()
+              : 'Your Business');
+    final businessType = (vendor?.businessType ?? '').trim().isNotEmpty
+        ? vendor!.businessType.trim()
+        : (_businessTypeController.text.trim().isNotEmpty
+              ? _businessTypeController.text.trim()
+              : 'Business Type');
 
     // Get location from locationData or fallback to form fields or location string
     String addressDisplay = '';

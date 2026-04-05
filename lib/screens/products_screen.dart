@@ -1,3 +1,24 @@
+// =============================================================================
+// PRODUCTS SCREEN
+// =============================================================================
+//
+// Purpose: Comprehensive product management for vendor inventory
+// Features:
+// - Product catalog display with search and filtering
+// - Add/edit/delete product functionality
+// - Image upload and management
+// - Category-based organization
+// - Real-time inventory updates
+// - Bulk operations support
+//
+// Sections:
+// 1. Image Helper Functions - Image processing and URL management
+// 2. Product Management State - Controllers and data management
+// 3. UI Components - Search, filters, and product cards
+// 4. Product Forms - Add/Edit product dialogs
+// 5. Image Handling - Camera/gallery integration
+// =============================================================================
+
 import 'dart:async';
 import 'dart:io';
 
@@ -12,6 +33,10 @@ import '../utils/product_image_helper.dart';
 import '../services/image_upload_service.dart';
 import '../utils/secure_logger.dart';
 
+// =============================================================================
+// IMAGE HELPER FUNCTIONS
+// =============================================================================
+
 bool _isLocalFilePath(String path) => ProductImageHelper.isLocalFilePath(path);
 
 String _normalizeImagePath(String rawPath) =>
@@ -24,6 +49,10 @@ String _resolveImageUrl(String rawPath, {String? cacheBustKey}) =>
       cacheBustKey: cacheBustKey,
     ) ??
     '';
+
+// =============================================================================
+// PRODUCT MANAGEMENT STATE
+// =============================================================================
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -934,7 +963,9 @@ class _AddProductDialogState extends State<AddProductDialog> {
           if (failedUploads.isNotEmpty) {
             scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text('${failedUploads.length} images failed to upload'),
+                content: Text(
+                  '${failedUploads.length} images failed to upload',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 3),
               ),

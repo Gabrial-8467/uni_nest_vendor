@@ -5,6 +5,27 @@ import '../utils/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../screens/live_chat_screen.dart';
 
+// =============================================================================
+// HELP AND SUPPORT SCREEN
+// =============================================================================
+//
+// Purpose: Comprehensive help and support system for vendors
+// Features:
+// - FAQ section with common questions
+// - Quick help guides
+// - Contact support options
+// - Live chat integration
+// - Report issues functionality
+// - Resource links and documentation
+//
+// Sections:
+// 1. Quick Help - Common questions and solutions
+// 2. Contact Support - Multiple support channels
+// 3. Resources - Documentation and links
+// 4. Report Issues - Bug reporting and feedback
+// 5. Live Chat - Real-time support integration
+// =============================================================================
+
 class HelpAndSupportScreen extends StatefulWidget {
   const HelpAndSupportScreen({super.key});
 

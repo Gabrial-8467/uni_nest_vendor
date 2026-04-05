@@ -1,6 +1,28 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
+// =============================================================================
+// TERMS OF SERVICE SCREEN
+// =============================================================================
+//
+// Purpose: Display comprehensive terms of service for vendor app users
+// Features:
+// - Clear terms and conditions
+// - Service usage guidelines
+// - Vendor responsibilities
+// - Payment and fee information
+// - Legal disclaimers and limitations
+//
+// Sections:
+// 1. Service Terms - Main terms and conditions
+// 2. Vendor Obligations - Responsibilities and requirements
+// 3. Payment Terms - Fees, commissions, and settlements
+// 4. Content Guidelines - Product and service content rules
+// 5. Intellectual Property - Rights and licenses
+// 6. Limitation of Liability - Legal disclaimers
+// 7. Termination - Service termination conditions
+// =============================================================================
+
 class TermsOfServiceScreen extends StatelessWidget {
   const TermsOfServiceScreen({super.key});
 

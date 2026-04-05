@@ -17,6 +17,28 @@ import 'analytics_screen.dart';
 import 'profile_screen.dart';
 import 'notification_screen.dart';
 
+// =============================================================================
+// VENDOR DASHBOARD SCREEN (LEGACY)
+// =============================================================================
+//
+// Purpose: Main dashboard for vendor operations (Legacy Provider architecture)
+// Features:
+// - Real-time order monitoring
+// - Revenue and analytics overview
+// - Quick stats and metrics
+// - Recent orders display
+// - Navigation to other screens
+//
+// Sections:
+// 1. Dashboard Header - Welcome message and quick actions
+// 2. Quick Stats - Key performance indicators
+// 3. Revenue Chart - Visual revenue analytics
+// 4. Recent Orders - Latest order updates
+// 5. Quick Actions - Navigation shortcuts
+//
+// Note: This is the legacy dashboard. New vendor app uses dashboard_screen.dart
+// =============================================================================
+
 class VendorDashboardScreen extends StatefulWidget {
   const VendorDashboardScreen({super.key});
 
@@ -438,8 +460,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       ),
       AnalyticsCard(
         title: 'Pending Settlement',
-        value:
-            '₹${vendorProvider.pendingSettlementBalance.toStringAsFixed(2)}',
+        value: '₹${vendorProvider.pendingSettlementBalance.toStringAsFixed(2)}',
         icon: Icons.hourglass_top_outlined,
         color: Colors.orange,
       ),
@@ -538,7 +559,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final month = dateTime.month.toString().padLeft(2, '0');
     return '$day/$month/${dateTime.year}';
   }
-
 }
 
 class _OverviewTabHost extends StatelessWidget {
@@ -546,7 +566,8 @@ class _OverviewTabHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.findAncestorStateOfType<_VendorDashboardScreenState>();
+    final state = context
+        .findAncestorStateOfType<_VendorDashboardScreenState>();
     if (state == null) {
       return const SizedBox.shrink();
     }

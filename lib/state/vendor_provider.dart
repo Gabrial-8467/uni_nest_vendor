@@ -113,6 +113,53 @@ class VendorProvider extends ChangeNotifier {
     return null;
   }
 
+  Vendor _buildVendorFromAuthPayload({
+    Map<String, dynamic>? user,
+    Map<String, dynamic>? vendor,
+    Map<String, dynamic>? fallbackVendorData,
+  }) {
+    final merged = <String, dynamic>{
+      ...?fallbackVendorData,
+      ...?vendor,
+      ...?user,
+    };
+
+    if (vendor != null) {
+      merged['user'] = user ?? vendor['user'];
+    }
+
+    return Vendor.fromJson(merged);
+  }
+
+  Vendor _applyVendorFallbacks(
+    Vendor vendor,
+    Map<String, dynamic>? fallbackVendorData,
+  ) {
+    if (fallbackVendorData == null) {
+      return vendor;
+    }
+
+    String? readString(String key) {
+      final value = fallbackVendorData[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+      return null;
+    }
+
+    return vendor.copyWith(
+      name: vendor.name.isNotEmpty ? vendor.name : readString('name'),
+      email: vendor.email.isNotEmpty ? vendor.email : readString('email'),
+      phone: vendor.phone.isNotEmpty ? vendor.phone : readString('phone'),
+      businessName: vendor.businessName.isNotEmpty
+          ? vendor.businessName
+          : readString('businessName'),
+      businessType: vendor.businessType.isNotEmpty
+          ? vendor.businessType
+          : readString('businessType'),
+    );
+  }
+
   Future<bool> _ensureAuthenticatedSession() async {
     if (!_isAuthenticated || _currentVendor == null) {
       return false;
@@ -161,8 +208,9 @@ class VendorProvider extends ChangeNotifier {
             _readToken(tokens, const ['refreshToken', 'refresh_token']) ??
             _readToken(data, const ['refreshToken', 'refresh_token']) ??
             _readToken(response, const ['refreshToken', 'refresh_token']);
-        _currentVendor = Vendor.fromJson(
-          user ?? (response['vendor'] as Map<String, dynamic>? ?? {}),
+        _currentVendor = _buildVendorFromAuthPayload(
+          user: user,
+          vendor: response['vendor'] as Map<String, dynamic>?,
         );
 
         if (_authToken == null || _authToken!.isEmpty) {
@@ -220,8 +268,13 @@ class VendorProvider extends ChangeNotifier {
             _readToken(tokens, const ['refreshToken', 'refresh_token']) ??
             _readToken(data, const ['refreshToken', 'refresh_token']) ??
             _readToken(response, const ['refreshToken', 'refresh_token']);
-        _currentVendor = Vendor.fromJson(
-          user ?? (response['vendor'] as Map<String, dynamic>? ?? {}),
+        _currentVendor = _applyVendorFallbacks(
+          _buildVendorFromAuthPayload(
+            user: user,
+            vendor: response['vendor'] as Map<String, dynamic>?,
+            fallbackVendorData: vendorData,
+          ),
+          vendorData,
         );
 
         if (_authToken == null || _authToken!.isEmpty) {
