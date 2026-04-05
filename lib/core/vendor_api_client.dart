@@ -288,6 +288,10 @@ class VendorApiClient {
     await _request(method: 'DELETE', path: '/notifications/clear-all');
   }
 
+  Future<void> deleteNotification(String notificationId) async {
+    await _request(method: 'DELETE', path: '/notifications/$notificationId');
+  }
+
   Future<Map<String, dynamic>> _request({
     required String method,
     required String path,

@@ -47,24 +47,43 @@ class AuthController extends StateNotifier<AuthState> {
   AuthController(this._read) : super(const AuthState());
 
   final Ref _read;
+  bool _isDisposed = false;
 
   VendorApiClient get _apiClient => _read.read(vendorApiClientProvider);
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
 
   Future<void> bootstrap() async {
     if (state.didBootstrap) {
       return;
     }
 
-    state = state.copyWith(isLoading: true, clearError: true);
+    if (!_isDisposed) {
+      try {
+        state = state.copyWith(isLoading: true, clearError: true);
+      } catch (e) {
+        // Widget was disposed, ignore state update
+      }
+    }
     try {
       final session = await _apiClient.restoreSession();
       if (session == null) {
-        state = state.copyWith(
-          isLoading: false,
-          didBootstrap: true,
-          session: null,
-          clearError: true,
-        );
+        if (!_isDisposed) {
+          try {
+            state = state.copyWith(
+              isLoading: false,
+              didBootstrap: true,
+              session: null,
+              clearError: true,
+            );
+          } catch (e) {
+            // Widget was disposed, ignore state update
+          }
+        }
         return;
       }
 
@@ -77,23 +96,47 @@ class AuthController extends StateNotifier<AuthState> {
           profile: profile,
         );
         await _apiClient.persistSession(hydrated);
+        if (!_isDisposed) {
+          try {
+            state = state.copyWith(
+              isLoading: false,
+              session: hydrated,
+              didBootstrap: true,
+              clearError: true,
+            );
+          } catch (e) {
+            // Widget was disposed, ignore state update
+          }
+        }
       } catch (_) {
         await _apiClient.persistSession(session);
+        if (!_isDisposed) {
+          try {
+            state = state.copyWith(
+              isLoading: false,
+              session: hydrated,
+              didBootstrap: true,
+              clearError: true,
+            );
+          } catch (e) {
+            // Widget was disposed, ignore state update
+          }
+        }
       }
-      state = state.copyWith(
-        isLoading: false,
-        session: hydrated,
-        didBootstrap: true,
-        clearError: true,
-      );
     } catch (error) {
       await _apiClient.clearSession();
-      state = state.copyWith(
-        isLoading: false,
-        didBootstrap: true,
-        session: null,
-        errorMessage: error.toString(),
-      );
+      if (!_isDisposed) {
+        try {
+          state = state.copyWith(
+            isLoading: false,
+            didBootstrap: true,
+            session: null,
+            errorMessage: error.toString(),
+          );
+        } catch (e) {
+          // Widget was disposed, ignore state update
+        }
+      }
     }
   }
 
@@ -206,9 +249,59 @@ class AuthController extends StateNotifier<AuthState> {
         profile: profile,
       );
       await _apiClient.persistSession(hydrated);
-      state = state.copyWith(session: hydrated, clearError: true);
+      try {
+        state = state.copyWith(session: hydrated, clearError: true);
+      } catch (e) {
+        // Widget was disposed, ignore state update
+      }
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString());
+      try {
+        state = state.copyWith(errorMessage: error.toString());
+      } catch (e) {
+        // Widget was disposed, ignore state update
+      }
+    }
+  }
+
+  Future<bool> updateProfile(Map<String, dynamic> profileData) async {
+    final session = state.session;
+    if (session == null) {
+      return false;
+    }
+
+    try {
+      state = state.copyWith(isLoading: true, clearError: true);
+    } catch (e) {
+      // Widget was disposed, ignore state update
+    }
+    try {
+      final updatedProfile = await _apiClient.updateProfile(profileData);
+      final hydrated = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        profile: updatedProfile,
+      );
+      await _apiClient.persistSession(hydrated);
+      try {
+        state = state.copyWith(
+          isLoading: false,
+          session: hydrated,
+          clearError: true,
+        );
+      } catch (e) {
+        // Widget was disposed, ignore state update
+      }
+      return true;
+    } catch (error) {
+      try {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: error.toString(),
+        );
+      } catch (e) {
+        // Widget was disposed, ignore state update
+      }
+      return false;
     }
   }
 

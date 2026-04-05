@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:math' as math;
 import '../utils/app_theme.dart';
 import '../providers/order_provider.dart';
 
@@ -102,6 +103,62 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
     return dailyRevenue;
   }
 
+  // Helper method to calculate grid interval for Y-axis
+  double _calculateGridInterval() {
+    final dailyRevenue = _dailyRevenueLast7Days;
+    if (dailyRevenue.isEmpty) return 50.0;
+
+    final maxValue = dailyRevenue.reduce((a, b) => a > b ? a : b);
+    if (maxValue == 0) return 50.0;
+
+    // Calculate a nice interval (aim for 4-5 grid lines)
+    final roughInterval = maxValue / 4;
+    final magnitude = math
+        .pow(10, (math.log(roughInterval) / math.log(10)).floor())
+        .toDouble();
+    final normalizedInterval = roughInterval / magnitude;
+
+    double interval;
+    if (normalizedInterval <= 1) {
+      interval = magnitude;
+    } else if (normalizedInterval <= 2) {
+      interval = (2 * magnitude).toDouble();
+    } else if (normalizedInterval <= 5) {
+      interval = (5 * magnitude).toDouble();
+    } else {
+      interval = (10 * magnitude).toDouble();
+    }
+
+    return interval;
+  }
+
+  // Helper method to get revenue trend percentage
+  double _getRevenueTrend() {
+    final dailyRevenue = _dailyRevenueLast7Days;
+    if (dailyRevenue.length < 2) return 0.0;
+
+    final firstHalf = dailyRevenue.take(3).reduce((a, b) => a + b);
+    final secondHalf = dailyRevenue.skip(4).take(3).reduce((a, b) => a + b);
+
+    if (firstHalf == 0) return 0.0;
+    return ((secondHalf - firstHalf) / firstHalf) * 100;
+  }
+
+  // Helper method to get average revenue
+  double get _averageRevenue {
+    final dailyRevenue = _dailyRevenueLast7Days;
+    if (dailyRevenue.isEmpty) return 0.0;
+    return dailyRevenue.reduce((a, b) => a + b) / dailyRevenue.length;
+  }
+
+  // Helper method to format revenue values
+  String _formatRevenue(double value) {
+    if (value >= 1000) {
+      return '₹${(value / 1000).toStringAsFixed(1)}k';
+    }
+    return '₹${value.toInt()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     // final orderState = ref.watch(orderProvider); // Not used currently
@@ -112,7 +169,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         backgroundColor: AppTheme.surface,
         elevation: 0,
         foregroundColor: AppTheme.textPrimary,
-        toolbarHeight: 10,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Analytics',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+        ),
+        centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primary,
@@ -616,38 +681,303 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: List.generate(7, (index) {
-                      return FlSpot(
-                        (index + 1).toDouble(),
-                        dailyRevenue[index],
-                      );
-                    }),
-                    isCurved: true,
-                    color: AppTheme.primary,
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: const FlDotData(show: true),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: AppTheme.primary.withValues(alpha: 0.1),
+            height: 280,
+            child: Column(
+              children: [
+                // Chart legend and stats
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '₹${_totalRevenue.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          'Total Revenue',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getRevenueTrend() > 0
+                            ? Colors.green[100]
+                            : Colors.red[100],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _getRevenueTrend() > 0
+                              ? Colors.green
+                              : Colors.red,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getRevenueTrend() > 0
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 16,
+                            color: _getRevenueTrend() > 0
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_getRevenueTrend() > 0 ? '+' : ''}${_getRevenueTrend().toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _getRevenueTrend() > 0
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Enhanced chart
+                Expanded(
+                  child: LineChart(
+                    LineChartData(
+                      // Enhanced grid configuration
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: _calculateGridInterval(),
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey[200]!,
+                            strokeWidth: 1,
+                            dashArray: [3, 3],
+                          );
+                        },
+                      ),
+
+                      // Enhanced titles configuration
+                      titlesData: FlTitlesData(
+                        show: true,
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: _calculateGridInterval(),
+                            reservedSize: 45,
+                            getTitlesWidget: (value, meta) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  _formatRevenue(value),
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 35,
+                            getTitlesWidget: (value, meta) {
+                              final dayNames = [
+                                'Mon',
+                                'Tue',
+                                'Wed',
+                                'Thu',
+                                'Fri',
+                                'Sat',
+                                'Sun',
+                              ];
+                              final index = value.toInt() - 1;
+                              if (index >= 0 && index < dayNames.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    dayNames[index],
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+
+                      // Enhanced border configuration
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.grey[300]!,
+                            width: 1,
+                          ),
+                          left: BorderSide(color: Colors.grey[300]!, width: 1),
+                          right: const BorderSide(color: Colors.transparent),
+                          top: const BorderSide(color: Colors.transparent),
+                        ),
+                      ),
+
+                      // Enhanced line data with multiple elements
+                      lineBarsData: [
+                        // Main revenue line
+                        LineChartBarData(
+                          spots: List.generate(7, (index) {
+                            return FlSpot(
+                              (index + 1).toDouble(),
+                              dailyRevenue[index],
+                            );
+                          }),
+                          isCurved: true,
+                          color: AppTheme.primary,
+                          barWidth: 4,
+                          isStrokeCapRound: true,
+
+                          // Enhanced dots with animation
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, barData, index) {
+                              return FlDotCirclePainter(
+                                radius: 5,
+                                color: AppTheme.primary,
+                                strokeWidth: 2,
+                                strokeColor: Colors.white,
+                              );
+                            },
+                          ),
+
+                          // Enhanced gradient fill
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primary.withValues(alpha: 0.4),
+                                AppTheme.primary.withValues(alpha: 0.2),
+                                AppTheme.primary.withValues(alpha: 0.05),
+                                Colors.transparent,
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0.0, 0.3, 0.6, 1.0],
+                            ),
+                          ),
+
+                          // Shadow effect
+                          shadow: Shadow(
+                            blurRadius: 12,
+                            color: AppTheme.primary.withValues(alpha: 0.4),
+                            offset: const Offset(0, 4),
+                          ),
+                        ),
+
+                        // Average line (subtle)
+                        LineChartBarData(
+                          spots: List.generate(7, (index) {
+                            return FlSpot(
+                              (index + 1).toDouble(),
+                              _averageRevenue,
+                            );
+                          }),
+                          isCurved: false,
+                          color: Colors.grey[400]!,
+                          barWidth: 2,
+                          isStrokeCapRound: true,
+                          dashArray: [5, 5],
+                          dotData: FlDotData(show: false),
+                          belowBarData: BarAreaData(show: false),
+                        ),
+                      ],
+
+                      // Enhanced axis configuration
+                      minX: 1,
+                      maxX: 7,
+                      minY: 0,
+                      maxY: dailyRevenue.isNotEmpty
+                          ? (dailyRevenue.reduce((a, b) => a > b ? a : b) * 1.3)
+                                .ceilToDouble()
+                          : 100,
+
+                      // Enhanced touch interactions
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (group) => Colors.black87,
+                          tooltipRoundedRadius: 12,
+                          tooltipPadding: const EdgeInsets.all(12),
+                          tooltipMargin: 8,
+                          getTooltipItems: (spots) {
+                            return spots.map((spot) {
+                              final dayNames = [
+                                'Monday',
+                                'Tuesday',
+                                'Wednesday',
+                                'Thursday',
+                                'Friday',
+                                'Saturday',
+                                'Sunday',
+                              ];
+                              final index = spot.x.toInt() - 1;
+                              final dayName =
+                                  index >= 0 && index < dayNames.length
+                                  ? dayNames[index]
+                                  : 'Day';
+
+                              // Check if this is above or below average
+                              final isAboveAverage = spot.y > _averageRevenue;
+                              final trendIcon = isAboveAverage ? '📈' : '📉';
+
+                              return LineTooltipItem(
+                                '$trendIcon $dayName\n₹${spot.y.toStringAsFixed(2)}\n${isAboveAverage ? 'Above' : 'Below'} avg: ₹${_averageRevenue.toStringAsFixed(2)}',
+                                const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                        handleBuiltInTouches: true,
+                        touchSpotThreshold: 20,
+                      ),
+
+                      // Animation configuration (fl_chart doesn't support animationDuration directly)
+                      // The chart will animate automatically when data changes
                     ),
                   ),
-                ],
-                minX: 1,
-                maxX: 7,
-                minY: 0,
-                maxY: dailyRevenue.isNotEmpty
-                    ? dailyRevenue.reduce((a, b) => a > b ? a : b) * 1.2
-                    : 100,
-              ),
+                ),
+              ],
             ),
           ),
         ],

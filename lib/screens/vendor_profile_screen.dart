@@ -25,11 +25,11 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
   void initState() {
     super.initState();
     _headerAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _cardAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
@@ -43,15 +43,10 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
     );
 
     _headerAnimationController.forward();
-    Future.delayed(const Duration(milliseconds: 200), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         _cardAnimationController.forward();
       }
-    });
-
-    // Load orders on initialization
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(orderProvider.notifier).loadOrders();
     });
   }
 
@@ -68,38 +63,20 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
     final profile = authState.session?.profile;
     final orderState = ref.watch(orderProvider);
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref.read(authProvider.notifier).refreshProfile();
-        await ref.read(orderProvider.notifier).loadOrders();
-        _headerAnimationController.reset();
-        _cardAnimationController.reset();
-        _headerAnimationController.forward();
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) {
-            _cardAnimationController.forward();
-          }
-        });
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildProfileHeader(profile, orderState),
-            const SizedBox(height: 24),
-            _buildBusinessDetails(profile),
-            const SizedBox(height: 24),
-            _buildContactInfo(profile),
-            const SizedBox(height: 24),
-            _buildQuickActions(authState),
-            if (authState.errorMessage != null) ...[
-              const SizedBox(height: 24),
-              _buildErrorCard(authState.errorMessage!),
-            ],
-            const SizedBox(height: 32),
-          ],
-        ),
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _buildProfileHeader(profile, orderState),
+          const SizedBox(height: 24),
+          _buildBusinessDetails(profile),
+          const SizedBox(height: 24),
+          _buildContactInfo(profile),
+          const SizedBox(height: 24),
+          _buildQuickActions(authState),
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }
@@ -317,16 +294,6 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
                         : humanizeEnum(profile!.businessType!),
                     color: const Color(0xFFEC4899),
                   ),
-                  _buildDivider(),
-                  _buildInfoTile(
-                    icon: Icons.description_outlined,
-                    label: 'Description',
-                    value:
-                        profile?.description ??
-                        'No business description added yet.',
-                    color: const Color(0xFF10B981),
-                    isMultiline: true,
-                  ),
                 ],
               ),
             ),
@@ -384,126 +351,46 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
               title: 'Quick Actions',
               icon: Icons.flash_on_outlined,
               iconColor: const Color(0xFFF59E0B),
-              child: Column(
-                children: [
-                  _buildActionTile(
-                    icon: Icons.refresh_outlined,
-                    title: 'Refresh Profile',
-                    subtitle: 'Sync latest data from server',
-                    color: const Color(0xFF3B82F6),
-                    onTap: () => _handleRefreshProfile(),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildActionTile(
-                    icon: Icons.sync_problem_outlined,
-                    title: 'Troubleshoot',
-                    subtitle: 'Fix connection issues',
-                    color: const Color(0xFFF59E0B),
-                    onTap: () => _showTroubleshootDialog(),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildActionTile(
-                    icon: Icons.logout,
-                    title: 'Logout',
-                    subtitle: 'Sign out from your account',
-                    color: const Color(0xFFEF4444),
-                    onTap: () => _handleLogout(),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildActionTile(
-                    icon: Icons.analytics_outlined,
-                    title: 'Analytics',
-                    subtitle: 'View performance analytics',
-                    color: const Color(0xFF10B981),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AnalyticsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildActionTile(
+                      icon: Icons.edit_outlined,
+                      title: 'Edit Profile',
+                      subtitle: 'Update your business information',
+                      color: const Color(0xFF8B5CF6),
+                      onTap: () => _showEditProfileDialog(),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildActionTile(
+                      icon: Icons.analytics_outlined,
+                      title: 'Analytics',
+                      subtitle: 'View performance analytics',
+                      color: const Color(0xFF10B981),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AnalyticsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildActionTile(
+                      icon: Icons.logout,
+                      title: 'Logout',
+                      subtitle: 'Sign out from your account',
+                      color: const Color(0xFFEF4444),
+                      onTap: () => _handleLogout(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildErrorCard(String error) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.red.withValues(alpha: 0.1),
-            Colors.red.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Connection Error',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _getFriendlyErrorMessage(error),
-            style: TextStyle(color: Colors.red[700], fontSize: 14, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                await Future.wait([
-                  ref.read(authProvider.notifier).refreshProfile(),
-                  ref.read(orderProvider.notifier).loadOrders(),
-                ]);
-              },
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -677,128 +564,6 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
     );
   }
 
-  Future<void> _handleRefreshProfile() async {
-    ref.read(authProvider.notifier).clearError();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: 12),
-              Text('Refreshing profile...'),
-            ],
-          ),
-          duration: Duration(seconds: 10),
-        ),
-      );
-    }
-
-    try {
-      await Future.wait([
-        ref.read(authProvider.notifier).refreshProfile(),
-        ref.read(orderProvider.notifier).loadOrders(),
-      ]);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Profile refreshed successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text(_getFriendlyErrorMessage(e.toString()))),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: () async {
-                await _handleRefreshProfile();
-              },
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  void _showTroubleshootDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Connection Troubleshoot'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Try these steps to fix connection issues:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 12),
-            Text('1. Check your internet connection'),
-            Text('2. Wait a few seconds and try again'),
-            Text('3. Restart app if problems persist'),
-            Text('4. Contact support if issue continues'),
-            SizedBox(height: 12),
-            Text(
-              'Common issues:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text('• Slow or unstable internet'),
-            Text('• Server temporarily unavailable'),
-            Text('• Session expired'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await Future.wait([
-                ref.read(authProvider.notifier).refreshProfile(),
-                ref.read(orderProvider.notifier).loadOrders(),
-              ]);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Test Connection'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -843,25 +608,282 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 
-  static String _getFriendlyErrorMessage(String error) {
-    final lowerError = error.toLowerCase();
+  void _showEditProfileDialog() {
+    final authState = ref.read(authProvider);
+    final profile = authState.session?.profile;
 
-    if (lowerError.contains('network') || lowerError.contains('connection')) {
-      return 'Unable to connect to server. Please check your internet connection and try again.';
-    } else if (lowerError.contains('timeout')) {
-      return 'Request timed out. Please try again.';
-    } else if (lowerError.contains('unauthorized') ||
-        lowerError.contains('401')) {
-      return 'Session expired. Please log in again.';
-    } else if (lowerError.contains('forbidden') || lowerError.contains('403')) {
-      return 'Access denied. Please check your permissions.';
-    } else if (lowerError.contains('not found') || lowerError.contains('404')) {
-      return 'Profile not found. Please contact support.';
-    } else if (lowerError.contains('server error') ||
-        lowerError.contains('500')) {
-      return 'Server is temporarily unavailable. Please try again in a few minutes.';
-    } else {
-      return 'An unexpected error occurred. Please try again or contact support if problem persists.';
-    }
+    if (profile == null) return;
+
+    // Create text controllers with current values
+    final nameController = TextEditingController(text: profile.name);
+    final businessNameController = TextEditingController(
+      text: profile.businessName,
+    );
+    final phoneController = TextEditingController(text: profile.phone);
+
+    // Business type options
+    final businessTypes = [
+      'Restaurant',
+      'Cafe',
+      'Bakery',
+      'Fast Food',
+      'Food Truck',
+      'Cloud Kitchen',
+      'Catering',
+      'Other',
+    ];
+
+    String selectedBusinessType = profile.businessType ?? 'Restaurant';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.edit_outlined, color: AppTheme.primary),
+              const SizedBox(width: 12),
+              const Text('Edit Profile'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Personal Information Section
+                const Text(
+                  'Personal Information',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Name Field
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Full Name',
+                    hintText: 'Enter your full name',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Phone Field
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    hintText: 'Enter your phone number',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Business Information Section
+                const Text(
+                  'Business Information',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Business Name Field
+                TextField(
+                  controller: businessNameController,
+                  decoration: InputDecoration(
+                    labelText: 'Business Name',
+                    hintText: 'Enter your business name',
+                    prefixIcon: const Icon(Icons.business_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Business Type Dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: selectedBusinessType,
+                  decoration: InputDecoration(
+                    labelText: 'Business Type',
+                    prefixIcon: const Icon(Icons.category_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppTheme.primary),
+                    ),
+                  ),
+                  items: businessTypes.map((String type) {
+                    return DropdownMenuItem<String>(
+                      value: type,
+                      child: Text(type),
+                    );
+                  }).toList(),
+                  onChanged: (String? value) {
+                    if (value != null) {
+                      setState(() {
+                        selectedBusinessType = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      // Store context before async operations
+                      final dialogContext = context;
+
+                      // Validate inputs
+                      if (nameController.text.trim().isEmpty ||
+                          businessNameController.text.trim().isEmpty ||
+                          phoneController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please fill in all required fields'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        isLoading = true;
+                      });
+
+                      try {
+                        // Prepare update data
+                        final updateData = {
+                          'name': nameController.text.trim(),
+                          'businessName': businessNameController.text.trim(),
+                          'phone': phoneController.text.trim(),
+                          'businessType': selectedBusinessType,
+                        };
+
+                        // Update profile via auth provider
+                        if (!mounted) return;
+
+                        final success = await ref
+                            .read(authProvider.notifier)
+                            .updateProfile(updateData);
+
+                        if (!mounted) return;
+
+                        if (success && mounted) {
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                          if (mounted && dialogContext.mounted) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text('Profile updated successfully!'),
+                                  ],
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } else if (mounted && dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Failed to update profile. Please try again.',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted && dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            isLoading = false;
+                          });
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Update Profile'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

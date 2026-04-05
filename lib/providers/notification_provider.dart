@@ -33,7 +33,12 @@ class NotificationState {
 }
 
 class NotificationController extends StateNotifier<NotificationState> {
-  NotificationController(this._ref) : super(const NotificationState());
+  NotificationController(this._ref) : super(const NotificationState()) {
+    // Use ref.onDispose for automatic cleanup when provider is disposed
+    _ref.onDispose(() {
+      _pollingTimer?.cancel();
+    });
+  }
 
   final Ref _ref;
   Timer? _pollingTimer;
@@ -42,6 +47,7 @@ class NotificationController extends StateNotifier<NotificationState> {
   Future<void> loadNotifications({bool silent = false}) async {
     if (!_ref.read(authProvider).isAuthenticated) {
       state = const NotificationState();
+      stopPolling();
       return;
     }
 
@@ -53,17 +59,35 @@ class NotificationController extends StateNotifier<NotificationState> {
     if (!silent) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
+
     try {
       final notifications = await _ref
           .read(vendorApiClientProvider)
           .getNotifications();
+
       state = state.copyWith(
         isLoading: false,
         notifications: notifications,
         clearError: true,
       );
     } catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+      // Check if it's a 401 authentication error
+      if (error.toString().contains('401') ||
+          error.toString().contains('User not found') ||
+          error.toString().contains('Session expired')) {
+        // Stop polling on authentication errors
+        stopPolling();
+        state = state.copyWith(
+          isLoading: false,
+          notifications: const [],
+          errorMessage: 'Authentication failed. Please login again.',
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: error.toString(),
+        );
+      }
     } finally {
       _isFetching = false;
     }
@@ -72,6 +96,7 @@ class NotificationController extends StateNotifier<NotificationState> {
   Future<bool> markAllAsRead() async {
     try {
       await _ref.read(vendorApiClientProvider).markAllNotificationsRead();
+
       state = state.copyWith(
         notifications: [
           for (final item in state.notifications)
@@ -97,7 +122,27 @@ class NotificationController extends StateNotifier<NotificationState> {
   Future<bool> clearAll() async {
     try {
       await _ref.read(vendorApiClientProvider).clearAllNotifications();
+
       state = state.copyWith(notifications: const [], clearError: true);
+      return true;
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> deleteNotification(String notificationId) async {
+    try {
+      await _ref
+          .read(vendorApiClientProvider)
+          .deleteNotification(notificationId);
+
+      state = state.copyWith(
+        notifications: state.notifications
+            .where((notification) => notification.id != notificationId)
+            .toList(),
+        clearError: true,
+      );
       return true;
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString());
@@ -135,12 +180,6 @@ class NotificationController extends StateNotifier<NotificationState> {
   void stopPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
-  }
-
-  @override
-  void dispose() {
-    stopPolling();
-    super.dispose();
   }
 }
 

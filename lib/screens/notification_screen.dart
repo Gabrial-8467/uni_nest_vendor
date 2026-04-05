@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/app_theme.dart';
-import '../services/vendor_api_service.dart';
-import '../services/auth_service.dart';
-import '../utils/secure_logger.dart';
+import '../providers/notification_provider.dart';
+import '../providers/auth_provider.dart';
+import '../models/ledger_models.dart';
 
 class Notification {
   final String id;
@@ -24,184 +25,43 @@ class Notification {
   });
 }
 
-class NotificationScreen extends StatefulWidget {
+class NotificationScreen extends ConsumerWidget {
   const NotificationScreen({super.key});
 
   @override
-  State<NotificationScreen> createState() => _NotificationScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notificationState = ref.watch(notificationProvider);
+    final authState = ref.watch(authProvider);
 
-class _NotificationScreenState extends State<NotificationScreen> {
-  List<Notification> notifications = [];
-  bool isLoading = true;
-  String? error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotifications();
-  }
-
-  Future<void> _loadNotifications() async {
-    try {
-      final authToken = await AuthService().getAuthToken();
-      if (authToken == null) {
-        setState(() {
-          isLoading = false;
-          error = 'Not authenticated';
-        });
-        return;
-      }
-
-      final response = await VendorApiService.getNotifications(authToken);
-
-      if (response['success'] == true && response['data'] != null) {
-        final notificationsData =
-            response['data']['notifications'] as List? ?? [];
-        setState(() {
-          notifications = notificationsData.map((notif) {
-            return Notification(
-              id: notif['_id']?.toString() ?? '',
-              title: notif['title']?.toString() ?? 'No Title',
-              message: notif['message']?.toString() ?? 'No Message',
-              timestamp:
-                  DateTime.tryParse(notif['createdAt']?.toString() ?? '') ??
-                  DateTime.now(),
-              type: notif['type']?.toString() ?? 'system',
-              isRead: notif['status']?.toString() == 'read',
-              data: notif['data'] as Map<String, dynamic>?,
-            );
-          }).toList();
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          isLoading = false;
-          error = response['message'] ?? 'Failed to load notifications';
-        });
-      }
-    } catch (e) {
-      SecureLogger.error('Failed to load notifications', error: e);
-      setState(() {
-        isLoading = false;
-        error = 'Failed to load notifications';
-      });
-    }
-  }
-
-  void _markAsRead(String notificationId) {
-    setState(() {
-      final index = notifications.indexWhere((n) => n.id == notificationId);
-      if (index != -1) {
-        notifications[index] = Notification(
-          id: notifications[index].id,
-          title: notifications[index].title,
-          message: notifications[index].message,
-          timestamp: notifications[index].timestamp,
-          type: notifications[index].type,
-          isRead: true,
-          data: notifications[index].data,
-        );
-      }
-    });
-  }
-
-  void _markAllAsRead() async {
-    try {
-      final authToken = await AuthService().getAuthToken();
-      if (authToken != null) {
-        final response = await VendorApiService.markAllNotificationsAsRead(
-          authToken,
-        );
-        if (response['success'] == true) {
-          setState(() {
-            notifications = notifications
-                .map(
-                  (notification) => Notification(
-                    id: notification.id,
-                    title: notification.title,
-                    message: notification.message,
-                    timestamp: notification.timestamp,
-                    type: notification.type,
-                    isRead: true,
-                    data: notification.data,
-                  ),
-                )
-                .toList();
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('All notifications marked as read')),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  response['message'] ?? 'Failed to mark all as read',
-                ),
+    // Check authentication
+    if (!authState.isAuthenticated) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          backgroundColor: AppTheme.surface,
+          elevation: 0,
+          foregroundColor: AppTheme.textPrimary,
+          title: const Text(
+            'Notifications',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.login_outlined, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'Please login to view notifications',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      SecureLogger.error('Failed to mark all notifications as read', error: e);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to mark all as read')),
-        );
-      }
+            ],
+          ),
+        ),
+      );
     }
-  }
 
-  void _deleteNotification(String notificationId) {
-    setState(() {
-      notifications.removeWhere((n) => n.id == notificationId);
-    });
-  }
-
-  void _clearAllNotifications() async {
-    try {
-      final authToken = await AuthService().getAuthToken();
-      if (authToken != null) {
-        final response = await VendorApiService.clearAllNotifications(
-          authToken,
-        );
-        if (response['success'] == true) {
-          setState(() {
-            notifications.clear();
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('All notifications cleared')),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  response['message'] ?? 'Failed to clear notifications',
-                ),
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      SecureLogger.error('Failed to clear all notifications', error: e);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to clear notifications')),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -213,13 +73,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (notifications.isNotEmpty)
+          if (notificationState.notifications.isNotEmpty)
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'mark_all_read') {
-                  _markAllAsRead();
+                  ref.read(notificationProvider.notifier).markAllAsRead();
                 } else if (value == 'clear_all') {
-                  _showClearAllDialog();
+                  _showClearAllDialog(context, ref);
                 }
               },
               itemBuilder: (context) => [
@@ -247,18 +107,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
         ],
       ),
-      body: isLoading
+      body: notificationState.isLoading
           ? _buildLoadingState()
-          : error != null
-          ? _buildErrorState()
-          : notifications.isEmpty
+          : notificationState.errorMessage != null
+          ? _buildErrorState(context, ref, notificationState.errorMessage!)
+          : notificationState.notifications.isEmpty
           ? _buildEmptyState()
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
+              itemCount: notificationState.notifications.length,
               itemBuilder: (context, index) {
-                final notification = notifications[index];
-                return _buildNotificationItem(notification);
+                final notification = notificationState.notifications[index];
+                return _buildNotificationItem(context, ref, notification);
               },
             ),
     );
@@ -272,7 +132,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(BuildContext context, WidgetRef ref, String error) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -288,13 +148,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            error ?? 'Something went wrong',
-            style: TextStyle(fontSize: 14, color: Colors.red[400]),
-          ),
+          Text(error, style: TextStyle(fontSize: 14, color: Colors.red[400])),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: _loadNotifications,
+            onPressed: () =>
+                ref.read(notificationProvider.notifier).loadNotifications(),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
@@ -335,7 +193,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildNotificationItem(Notification notification) {
+  Widget _buildNotificationItem(
+    BuildContext context,
+    WidgetRef ref,
+    VendorNotification notification,
+  ) {
     final iconData = _getNotificationIcon(notification.type);
     final iconColor = _getNotificationColor(notification.type);
 
@@ -358,8 +220,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            _markAsRead(notification.id);
-            _handleNotificationTap(notification);
+            ref
+                .read(notificationProvider.notifier)
+                .markReadLocally(notification.id);
+            _handleNotificationTap(context, notification);
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -406,7 +270,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        notification.message,
+                        notification.body,
                         style: TextStyle(
                           fontSize: 13,
                           color: notification.isRead
@@ -420,7 +284,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       Row(
                         children: [
                           Text(
-                            _formatTimestamp(notification.timestamp),
+                            _formatTimestamp(notification.createdAt),
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[500],
@@ -430,7 +294,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           PopupMenuButton<String>(
                             onSelected: (value) {
                               if (value == 'delete') {
-                                _deleteNotification(notification.id);
+                                ref
+                                    .read(notificationProvider.notifier)
+                                    .deleteNotification(notification.id);
                               }
                             },
                             itemBuilder: (context) => [
@@ -511,12 +377,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  void _handleNotificationTap(Notification notification) {
-    // Handle navigation based on notification type
+  void _handleNotificationTap(
+    BuildContext context,
+    VendorNotification notification,
+  ) {
     switch (notification.type) {
       case 'order':
         if (notification.data?['orderId'] != null) {
-          // Navigate to order details
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Opening order ${notification.data!['orderId']}'),
@@ -542,7 +409,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  void _showClearAllDialog() {
+  void _showClearAllDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -558,7 +425,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _clearAllNotifications();
+              ref.read(notificationProvider.notifier).clearAll();
             },
             child: const Text('Clear All'),
           ),
