@@ -24,14 +24,16 @@ class LedgerState {
   }
 }
 
-class LedgerController extends StateNotifier<LedgerState> {
-  LedgerController(this._ref) : super(const LedgerState());
+class LedgerController extends Notifier<LedgerState> {
+  @override
+  LedgerState build() {
+    return const LedgerState();
+  }
 
-  final Ref _ref;
   bool _isFetching = false;
 
   Future<void> loadLedger({bool silent = false}) async {
-    if (!_ref.read(authProvider).isAuthenticated) {
+    if (!ref.read(authProvider).isAuthenticated) {
       state = const LedgerState();
       return;
     }
@@ -45,7 +47,7 @@ class LedgerController extends StateNotifier<LedgerState> {
       state = state.copyWith(isLoading: true, clearError: true);
     }
     try {
-      final ledger = await _ref.read(vendorApiClientProvider).getLedger();
+      final ledger = await ref.read(vendorApiClientProvider).getLedger();
       state = state.copyWith(
         isLoading: false,
         ledger: ledger,
@@ -59,6 +61,6 @@ class LedgerController extends StateNotifier<LedgerState> {
   }
 }
 
-final ledgerProvider = StateNotifierProvider<LedgerController, LedgerState>(
-  (ref) => LedgerController(ref),
+final ledgerProvider = NotifierProvider<LedgerController, LedgerState>(
+  LedgerController.new,
 );

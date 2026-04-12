@@ -1,17 +1,36 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class PermissionService {
   static final PermissionService _instance = PermissionService._internal();
   factory PermissionService() => _instance;
   PermissionService._internal();
 
+  // Check if running on Android 13+ (API 33+)
+  static Future<bool> _isAndroid13OrHigher() async {
+    if (!Platform.isAndroid) return false;
+    final deviceInfo = DeviceInfoPlugin();
+    final androidInfo = await deviceInfo.androidInfo;
+    return androidInfo.version.sdkInt >= 33;
+  }
+
+  // Get storage permissions based on Android version
+  static Future<List<Permission>> _getStoragePermissions() async {
+    if (await _isAndroid13OrHigher()) {
+      // Android 13+ uses granular media permissions
+      return [Permission.photos, Permission.videos, Permission.audio];
+    }
+    // Android 12 and below uses legacy storage permission
+    return [Permission.storage];
+  }
+
   // Required permissions for the app
-  static final List<Permission> _requiredPermissions = [
-    Permission.camera,
-    Permission.storage,
-    Permission.notification,
-  ];
+  static Future<List<Permission>> _getRequiredPermissions() async {
+    final storagePermissions = await _getStoragePermissions();
+    return [Permission.camera, ...storagePermissions, Permission.notification];
+  }
 
   // Optional permissions
   static final List<Permission> _optionalPermissions = [
@@ -21,7 +40,8 @@ class PermissionService {
 
   // Check if all required permissions are granted
   static Future<bool> get areRequiredPermissionsGranted async {
-    for (final permission in _requiredPermissions) {
+    final requiredPermissions = await _getRequiredPermissions();
+    for (final permission in requiredPermissions) {
       final status = await permission.status;
       if (status != PermissionStatus.granted) {
         return false;
@@ -33,14 +53,47 @@ class PermissionService {
   // Request required permissions
   static Future<bool> requestRequiredPermissions() async {
     try {
+      final requiredPermissions = await _getRequiredPermissions();
       final Map<Permission, PermissionStatus> statuses =
-          await _requiredPermissions.request();
+          await requiredPermissions.request();
 
       return statuses.values.every(
         (status) => status == PermissionStatus.granted,
       );
     } catch (e) {
       debugPrint('Error requesting permissions: $e');
+      return false;
+    }
+  }
+
+  // Request storage permission only (for image picking)
+  static Future<bool> requestStoragePermission() async {
+    try {
+      final storagePermissions = await _getStoragePermissions();
+      final Map<Permission, PermissionStatus> statuses =
+          await storagePermissions.request();
+      return statuses.values.every(
+        (status) => status == PermissionStatus.granted,
+      );
+    } catch (e) {
+      debugPrint('Error requesting storage permission: $e');
+      return false;
+    }
+  }
+
+  // Check if storage permission is granted
+  static Future<bool> isStorageGranted() async {
+    try {
+      final storagePermissions = await _getStoragePermissions();
+      for (final permission in storagePermissions) {
+        final status = await permission.status;
+        if (status != PermissionStatus.granted) {
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking storage permission: $e');
       return false;
     }
   }
@@ -131,6 +184,12 @@ class PermissionService {
         return 'Camera Access - Take photos for products';
       case Permission.storage:
         return 'Storage Access - Save and load images';
+      case Permission.photos:
+        return 'Photos Access - Select product images';
+      case Permission.videos:
+        return 'Videos Access - Upload video content';
+      case Permission.audio:
+        return 'Audio Access - Upload audio content';
       case Permission.notification:
         return 'Notifications - Receive order updates';
       case Permission.location:
@@ -157,7 +216,8 @@ class PermissionService {
   // Check current permission status
   static Future<bool> _checkPermissionsStatus() async {
     try {
-      for (final permission in _requiredPermissions) {
+      final requiredPermissions = await _getRequiredPermissions();
+      for (final permission in requiredPermissions) {
         final status = await permission.status;
         if (status != PermissionStatus.granted) {
           debugPrint('Permission not granted: ${permission.toString()}');

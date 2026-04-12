@@ -105,8 +105,14 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
 
   @override
   void dispose() {
-    // Stop polling when widget is disposed
-    ref.read(notificationProvider.notifier).stopPolling();
+    // Stop polling when widget is disposed - check mounted to avoid errors
+    if (mounted) {
+      try {
+        ref.read(notificationProvider.notifier).stopPolling();
+      } catch (e) {
+        // Ignore errors if provider is already disposed
+      }
+    }
     super.dispose();
   }
 

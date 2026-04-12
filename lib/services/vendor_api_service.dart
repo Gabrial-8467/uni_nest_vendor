@@ -3,38 +3,32 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_endpoints.dart';
 import '../config/vendor_config.dart';
 import '../models/vendor_models.dart';
 import '../utils/secure_logger.dart';
 import 'image_upload_service.dart';
+import 'secure_auth_service.dart';
 
+/// Legacy AuthTokenStorage - delegates to SecureAuthService for secure storage
 class AuthTokenStorage {
   static Future<void> saveTokens({
     required String authToken,
     String? refreshToken,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(VendorConfig.tokenKey, authToken);
-
-    if (refreshToken != null && refreshToken.isNotEmpty) {
-      await prefs.setString(VendorConfig.refreshTokenKey, refreshToken);
-    }
+    await SecureAuthService.saveAuthSession(
+      authToken: authToken,
+      refreshToken: refreshToken,
+    );
   }
 
   static Future<String?> getAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(VendorConfig.tokenKey);
+    return SecureAuthService.getAuthToken();
   }
 
   static Future<void> clearSessionData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(VendorConfig.tokenKey);
-    await prefs.remove(VendorConfig.refreshTokenKey);
-    await prefs.remove(VendorConfig.vendorKey);
-    await prefs.remove(VendorConfig.settingsKey);
+    await SecureAuthService.clearAuthSession();
   }
 }
 
@@ -66,13 +60,19 @@ class ApiClient {
     };
 
     if (!requiresAuth) {
+      SecureLogger.info(
+        'Building headers without auth (public endpoint)',
+        tag: 'API_AUTH',
+      );
       return headers;
     }
 
+    SecureLogger.info('Building headers with auth...', tag: 'API_AUTH');
     final token = authTokenOverride ?? await AuthTokenStorage.getAuthToken();
+
     if (token == null || token.isEmpty) {
       SecureLogger.error(
-        'Blocked authenticated API call because auth token is missing',
+        'TOKEN MISSING: Cannot build auth headers - no token available',
         tag: 'API_AUTH',
       );
       throw VendorApiException(
@@ -81,6 +81,11 @@ class ApiClient {
         errorData: {'reason': 'token_missing'},
       );
     }
+
+    SecureLogger.info(
+      'TOKEN FOUND: ${token.substring(0, token.length > 20 ? 20 : token.length)}...',
+      tag: 'API_AUTH',
+    );
 
     headers[ApiHeaders.authorization] = 'Bearer $token';
     return headers;
@@ -308,7 +313,8 @@ class VendorApiService {
   static Future<Map<String, dynamic>> refreshToken(String refreshToken) {
     return Future.value(<String, dynamic>{
       'success': false,
-      'message': 'Refresh token endpoint is not available on the current backend.',
+      'message':
+          'Refresh token endpoint is not available on the current backend.',
     });
   }
 
@@ -424,10 +430,14 @@ class VendorApiService {
     String authToken,
   ) async {
     final uri = Uri.parse('${_apiClient._baseUrl}${ApiEndpoints.products}');
+    SecureLogger.info('Creating product at URL: $uri', tag: 'PRODUCTS');
+
     final request = http.MultipartRequest('POST', uri);
     request.headers[ApiHeaders.authorization] = 'Bearer $authToken';
     request.headers[ApiHeaders.accept] = ApiHeaders.applicationJson;
 
+    // Add product data fields
+    SecureLogger.info('Adding product data fields...', tag: 'PRODUCTS');
     productData.forEach((key, value) {
       if (value == null) return;
       if (value is List || value is Map<String, dynamic>) {
@@ -436,33 +446,77 @@ class VendorApiService {
         request.fields[key] = value.toString();
       }
     });
+    SecureLogger.info('Added ${request.fields.length} fields', tag: 'PRODUCTS');
 
-    for (final file in imageFiles) {
+    // Add image files
+    SecureLogger.info(
+      'Adding ${imageFiles.length} image file(s)...',
+      tag: 'PRODUCTS',
+    );
+    for (int i = 0; i < imageFiles.length; i++) {
+      final file = imageFiles[i];
+      final fileSize = await file.length();
+      SecureLogger.info(
+        'File $i: ${file.path} (${fileSize ~/ 1024}KB)',
+        tag: 'PRODUCTS',
+      );
       request.files.add(await http.MultipartFile.fromPath('images', file.path));
     }
 
     SecureLogger.info(
-      'Creating product with multipart upload: ${request.files.length} image(s)',
+      'Sending multipart request with ${request.files.length} image(s)...',
       tag: 'PRODUCTS',
     );
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-    final data = _apiClient._decodeResponseBody(response.body);
+    try {
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Product creation timed out after 30 seconds');
+        },
+      );
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      final payload = data['data'];
-      if (payload is Map<String, dynamic>) {
-        return Product.fromJson(payload);
+      SecureLogger.info(
+        'Got streamed response, reading body...',
+        tag: 'PRODUCTS',
+      );
+
+      final response = await http.Response.fromStream(streamedResponse);
+      SecureLogger.info(
+        'Response status: ${response.statusCode}',
+        tag: 'PRODUCTS',
+      );
+      SecureLogger.info('Response body: ${response.body}', tag: 'PRODUCTS');
+
+      final data = _apiClient._decodeResponseBody(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final payload = data['data'];
+        if (payload is Map<String, dynamic>) {
+          return Product.fromJson(payload);
+        }
+        return Product.fromJson(Map<String, dynamic>.from(data));
       }
-      return Product.fromJson(Map<String, dynamic>.from(data));
-    }
 
-    throw VendorApiException(
-      message: data['message']?.toString() ?? 'Product creation failed',
-      statusCode: response.statusCode,
-      errorData: data,
-    );
+      throw VendorApiException(
+        message: data['message']?.toString() ?? 'Product creation failed',
+        statusCode: response.statusCode,
+        errorData: data,
+      );
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      SecureLogger.error(
+        'Error during product creation',
+        error: e,
+        tag: 'PRODUCTS',
+      );
+      throw VendorApiException(
+        message: 'Network error: $e',
+        statusCode: -1,
+        errorData: {'error': e.toString()},
+      );
+    }
   }
 
   static Future<Product> updateProduct(
@@ -614,6 +668,73 @@ class VendorApiService {
     }
   }
 
+  /// Patch product (partial update - same validation as PUT)
+  static Future<Product> patchProduct(
+    String productId,
+    Map<String, dynamic> productData,
+    String authToken, {
+    List<File>? imageFiles,
+  }) async {
+    final uri = Uri.parse(
+      '${_apiClient._baseUrl}${ApiEndpoints.productById(productId)}',
+    );
+
+    // If there are image files, use multipart PATCH
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      final request = http.MultipartRequest('PATCH', uri);
+      request.headers['Authorization'] = 'Bearer $authToken';
+      request.headers['Accept'] = 'application/json';
+
+      productData.forEach((key, value) {
+        if (value != null) {
+          if (value is List || value is Map) {
+            request.fields[key] = jsonEncode(value);
+          } else {
+            request.fields[key] = value.toString();
+          }
+        }
+      });
+
+      for (final file in imageFiles) {
+        request.files.add(
+          await http.MultipartFile.fromPath('images', file.path),
+        );
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      final data = _apiClient._decodeResponseBody(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final payload = data['data'];
+        final productJson = payload is Map<String, dynamic>
+            ? payload
+            : Map<String, dynamic>.from(data);
+        return Product.fromJson(productJson);
+      }
+
+      throw VendorApiException(
+        message: data['message']?.toString() ?? 'Product patch failed',
+        statusCode: response.statusCode,
+        errorData: data,
+      );
+    } else {
+      // JSON-only PATCH
+      final response = await _makeRequest(
+        ApiMethods.patch,
+        ApiEndpoints.productById(productId),
+        body: productData,
+        authTokenOverride: authToken,
+      );
+
+      final payload = response['data'];
+      final productJson = payload is Map<String, dynamic>
+          ? payload
+          : Map<String, dynamic>.from(response);
+      return Product.fromJson(productJson);
+    }
+  }
+
   static Future<bool> deleteProduct(String productId, String authToken) async {
     await _makeRequest(
       ApiMethods.delete,
@@ -726,11 +847,20 @@ class VendorApiService {
     String orderId,
     String status,
     String authToken, {
-    String? notes,
+    String? note,
+    String? estimatedDeliveryTime,
+    String? otp,
   }) async {
     final body = <String, dynamic>{'status': status};
-    if (notes != null) {
-      body['note'] = notes;
+    if (note != null && note.trim().isNotEmpty) {
+      body['note'] = note.trim();
+    }
+    if (estimatedDeliveryTime != null &&
+        estimatedDeliveryTime.trim().isNotEmpty) {
+      body['estimatedDeliveryTime'] = estimatedDeliveryTime.trim();
+    }
+    if (otp != null && otp.trim().isNotEmpty) {
+      body['otp'] = otp.trim();
     }
 
     final response = await _makeRequest(
@@ -920,11 +1050,7 @@ class VendorApiService {
         .join('&');
     final endpoint = '${ApiEndpoints.notifications}?$queryString';
 
-    return _makeRequest(
-      ApiMethods.get,
-      endpoint,
-      authTokenOverride: authToken,
-    );
+    return _makeRequest(ApiMethods.get, endpoint, authTokenOverride: authToken);
   }
 
   static Future<Map<String, dynamic>> getNotificationById(
@@ -1021,6 +1147,175 @@ class VendorApiService {
     String authToken,
   ) {
     return Future.value(<String, dynamic>{'success': true, 'data': settings});
+  }
+
+  // ==================== ACTIVATE ACCOUNT ====================
+
+  /// Activate vendor account (development-only helper)
+  static Future<Map<String, dynamic>> activateAccount(String authToken) async {
+    return _makeRequest(
+      ApiMethods.post,
+      ApiEndpoints.activateAccount,
+      body: {},
+      authTokenOverride: authToken,
+    );
+  }
+
+  // ==================== REVIEWS ====================
+
+  /// Get all vendor reviews
+  static Future<Map<String, dynamic>> getReviews(
+    String authToken, {
+    int page = 1,
+    int limit = 20,
+    int? rating,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (rating != null) {
+      queryParams['rating'] = rating.toString();
+    }
+
+    final queryString = Uri(queryParameters: queryParams).query;
+    final endpoint = queryString.isEmpty
+        ? ApiEndpoints.reviews
+        : '${ApiEndpoints.reviews}?$queryString';
+
+    return _makeRequest(ApiMethods.get, endpoint, authTokenOverride: authToken);
+  }
+
+  /// Get reviews for a specific product
+  static Future<Map<String, dynamic>> getProductReviews(
+    String productId,
+    String authToken, {
+    int page = 1,
+    int limit = 10,
+    int? rating,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (rating != null) {
+      queryParams['rating'] = rating.toString();
+    }
+
+    final queryString = Uri(queryParameters: queryParams).query;
+    final endpoint = queryString.isEmpty
+        ? ApiEndpoints.productReviews(productId)
+        : '${ApiEndpoints.productReviews(productId)}?$queryString';
+
+    return _makeRequest(ApiMethods.get, endpoint, authTokenOverride: authToken);
+  }
+
+  // ==================== UPLOAD ENDPOINTS ====================
+
+  /// Upload vendor avatar
+  static Future<Map<String, dynamic>> uploadAvatar(
+    File imageFile,
+    String authToken,
+  ) async {
+    try {
+      final result = await ImageUploadService.uploadSingleImage(
+        imageFile,
+        authToken: authToken,
+        baseUrl: _apiClient._baseUrl,
+        endpoint: ApiEndpoints.uploadAvatar,
+      );
+
+      if (result.success) {
+        return {
+          'success': true,
+          'urls': [result.imageUrl],
+          'message': 'Avatar uploaded successfully',
+        };
+      } else {
+        return {'success': false, 'message': result.error ?? 'Upload failed'};
+      }
+    } catch (e) {
+      SecureLogger.error('Avatar upload failed', error: e);
+      return {'success': false, 'message': 'Upload error: $e'};
+    }
+  }
+
+  /// Upload product images (general endpoint)
+  static Future<Map<String, dynamic>> uploadProductImagesGeneral(
+    List<File> imageFiles,
+    String authToken,
+  ) async {
+    try {
+      final results = await ImageUploadService.uploadImages(
+        imageFiles,
+        authToken: authToken,
+        baseUrl: _apiClient._baseUrl,
+        endpoint: ApiEndpoints.uploadProductImages,
+      );
+
+      final successfulUploads = results.where((r) => r.success).toList();
+      final failedUploads = results.where((r) => !r.success).toList();
+
+      if (successfulUploads.isEmpty) {
+        return {
+          'success': false,
+          'message': 'All uploads failed',
+          'errors': failedUploads.map((r) => r.error).toList(),
+        };
+      }
+
+      return {
+        'success': true,
+        'data': {
+          'images': successfulUploads
+              .map((r) => {'url': r.imageUrl, 'alt': 'product_image'})
+              .toList(),
+          'failedCount': failedUploads.length,
+        },
+        'message': '${successfulUploads.length} images uploaded successfully',
+      };
+    } catch (e) {
+      SecureLogger.error('Product images upload failed', error: e);
+      return {'success': false, 'message': 'Upload error: $e'};
+    }
+  }
+
+  /// Upload vendor documents
+  static Future<Map<String, dynamic>> uploadDocuments(
+    List<File> documentFiles,
+    String authToken,
+  ) async {
+    try {
+      final results = await ImageUploadService.uploadImages(
+        documentFiles,
+        authToken: authToken,
+        baseUrl: _apiClient._baseUrl,
+        endpoint: ApiEndpoints.uploadDocuments,
+      );
+
+      final successfulUploads = results.where((r) => r.success).toList();
+      final failedUploads = results.where((r) => !r.success).toList();
+
+      if (successfulUploads.isEmpty) {
+        return {
+          'success': false,
+          'message': 'All uploads failed',
+          'errors': failedUploads.map((r) => r.error).toList(),
+        };
+      }
+
+      return {
+        'success': true,
+        'urls': successfulUploads.map((r) => r.imageUrl).toList(),
+        'message':
+            '${successfulUploads.length} documents uploaded successfully',
+      };
+    } catch (e) {
+      SecureLogger.error('Document upload failed', error: e);
+      return {'success': false, 'message': 'Upload error: $e'};
+    }
   }
 }
 

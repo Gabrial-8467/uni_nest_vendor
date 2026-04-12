@@ -932,8 +932,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
                       // Enhanced touch interactions
                       lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
-                          getTooltipColor: (group) => Colors.black87,
-                          tooltipRoundedRadius: 12,
+                          tooltipBgColor: Colors.black87,
                           tooltipPadding: const EdgeInsets.all(12),
                           tooltipMargin: 8,
                           getTooltipItems: (spots) {

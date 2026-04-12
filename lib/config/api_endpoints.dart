@@ -14,6 +14,7 @@ class ApiEndpoints {
   static const String dashboard = '/dashboard';
   static const String ledger = '/ledger';
   static const String payouts = '/payouts';
+  static const String activateAccount = '/activate-account';
 
   // Product Endpoints
   static const String products = '/products';
@@ -78,7 +79,9 @@ class QueryParameters {
   static const String search = 'search';
   static const String category = 'category';
   static const String status = 'status';
+  static const String availability = 'availability';
   static const String isAvailable = 'isAvailable';
+  static const String isFeatured = 'isFeatured';
   static const String sortBy = 'sortBy';
   static const String sortOrder = 'sortOrder';
 
@@ -173,9 +176,12 @@ class OrderSortBy {
 
 class NotificationTypes {
   static const String order = 'order';
-  static const String product = 'product';
+  static const String vendorStatus = 'vendor_status';
+  static const String vendorApproval = 'vendor_approval';
+  static const String review = 'review';
   static const String payment = 'payment';
   static const String system = 'system';
+  static const String accountAlert = 'account_alert';
   static const String promotion = 'promotion';
 }
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../providers/fixed_auth_provider.dart';
+import '../providers/auth_provider.dart';
 import 'api_client.dart';
 
 /// App initialization service
@@ -44,20 +44,19 @@ class AppInitializer {
   /// Set up global error handling
   void _setupErrorHandling() {
     // Listen to auth state changes and handle errors globally
-    ref.listen<AsyncValue<AuthState>>(authControllerProvider, (previous, next) {
-      next.whenOrNull(
-        error: (error, stack) {
-          debugPrint('Auth error: $error');
+    ref.listen(authProvider, (previous, next) {
+      // Check for authentication errors
+      if (next.errorMessage != null) {
+        debugPrint('Auth error: ${next.errorMessage}');
 
-          // Handle 401 errors globally
-          if (error.toString().contains('401') ||
-              error.toString().contains('unauthorized')) {
-            // Clear auth state and redirect to login
-            final authController = ref.read(authControllerProvider.notifier);
-            authController.handleAuthError();
-          }
-        },
-      );
+        // Handle 401 errors globally
+        if (next.errorMessage!.contains('401') ||
+            next.errorMessage!.contains('unauthorized')) {
+          // Clear auth state and redirect to login
+          final authController = ref.read(authProvider.notifier);
+          authController.logout();
+        }
+      }
     });
 
     debugPrint('Global error handling configured');

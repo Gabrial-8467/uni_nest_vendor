@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vendor_notification.dart';
 import '../services/vendor_notification_service.dart';
 
-/// Notification state management
+/// Vendor Notification state management
 @immutable
-class NotificationState {
-  const NotificationState({
+class VendorNotificationState {
+  const VendorNotificationState({
     this.notifications = const [],
     this.isLoading = false,
     this.errorMessage,
@@ -33,14 +33,14 @@ class NotificationState {
   /// Count of total notifications
   int get totalCount => notifications.length;
 
-  NotificationState copyWith({
+  VendorNotificationState copyWith({
     List<VendorNotification>? notifications,
     bool? isLoading,
     String? errorMessage,
     bool? isPolling,
     bool clearError = false,
   }) {
-    return NotificationState(
+    return VendorNotificationState(
       notifications: notifications ?? this.notifications,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
@@ -50,8 +50,9 @@ class NotificationState {
 }
 
 /// Notification controller using StateNotifier
-class NotificationController extends StateNotifier<NotificationState> {
-  NotificationController() : super(const NotificationState());
+class VendorNotificationController
+    extends StateNotifier<VendorNotificationState> {
+  VendorNotificationController() : super(const VendorNotificationState());
 
   Timer? _pollingTimer;
   static const Duration _pollingInterval = Duration(seconds: 10);
@@ -212,9 +213,10 @@ class NotificationController extends StateNotifier<NotificationState> {
 
 /// Provider for notification state
 final vendorNotificationProvider =
-    StateNotifierProvider<NotificationController, NotificationState>(
-      (ref) => NotificationController(),
-    );
+    StateNotifierProvider<
+      VendorNotificationController,
+      VendorNotificationState
+    >((ref) => VendorNotificationController());
 
 /// Provider for total count (computed)
 final totalCountProvider = Provider<int>((ref) {

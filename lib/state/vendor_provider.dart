@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_endpoints.dart';
 import '../models/vendor_models.dart';
 import '../services/vendor_api_service.dart';
+import '../services/secure_auth_service.dart';
 import '../config/vendor_config.dart';
 import '../utils/secure_logger.dart';
 
@@ -74,27 +75,84 @@ class VendorProvider extends ChangeNotifier {
 
   // Initialize provider
   Future<void> initialize() async {
+    SecureLogger.info(
+      '=== PROVIDER INITIALIZATION START ===',
+      tag: 'AUTH_INIT',
+    );
     await VendorConfig.initialize();
     await _loadAuthState();
+
     if (_isAuthenticated && _authToken != null) {
-      await loadVendorData();
+      if (_currentVendor == null) {
+        SecureLogger.info(
+          'Vendor null after auth load, fetching from API...',
+          tag: 'AUTH_INIT',
+        );
+        await loadVendorData();
+      }
     }
+
+    SecureLogger.info(
+      '=== PROVIDER INITIALIZATION COMPLETE ===\n'
+      'isAuth: $_isAuthenticated, hasToken: ${_authToken != null}, hasVendor: ${_currentVendor != null}',
+      tag: 'AUTH_INIT',
+    );
+    notifyListeners();
   }
 
-  // Load authentication state from storage
+  // Load authentication state from secure storage
   Future<void> _loadAuthState() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _authToken = prefs.getString(VendorConfig.tokenKey);
-      _refreshToken = prefs.getString(VendorConfig.refreshTokenKey);
+      SecureLogger.info(
+        'Loading auth state from secure storage...',
+        tag: 'AUTH',
+      );
+
+      // Load from secure storage
+      _authToken = await SecureAuthService.getAuthToken();
+      _refreshToken = await SecureAuthService.getRefreshToken();
       _isAuthenticated = _authToken != null && _authToken!.isNotEmpty;
 
+      SecureLogger.info(
+        'TOKEN: ${_authToken != null ? "PRESENT" : "MISSING"} | '
+        'REFRESH: ${_refreshToken != null ? "PRESENT" : "MISSING"} | '
+        'AUTH: $_isAuthenticated',
+        tag: 'AUTH',
+      );
+
       if (_isAuthenticated) {
-        final vendorData = prefs.getString(VendorConfig.vendorKey);
+        // Try to load vendor from secure storage
+        final vendorData = await SecureAuthService.getVendorData();
+        SecureLogger.info(
+          'VENDOR DATA: ${vendorData != null ? "PRESENT" : "MISSING"}',
+          tag: 'AUTH',
+        );
+
         if (vendorData != null) {
-          _currentVendor = Vendor.fromJson(
-            Map<String, dynamic>.from(await _decodeJson(vendorData)),
+          try {
+            _currentVendor = Vendor.fromJson(
+              Map<String, dynamic>.from(await _decodeJson(vendorData)),
+            );
+            SecureLogger.info(
+              'VENDOR LOADED: ${_currentVendor?.name} (ID: ${_currentVendor?.id})',
+              tag: 'AUTH',
+            );
+          } catch (e) {
+            SecureLogger.error(
+              'Failed to parse vendor from storage',
+              error: e,
+              tag: 'AUTH',
+            );
+          }
+        }
+
+        // Fallback: load from API if not in storage
+        if (_currentVendor == null && _authToken != null) {
+          SecureLogger.info(
+            'Vendor not in storage, will fetch from API...',
+            tag: 'AUTH',
           );
+          await loadVendorData();
         }
       }
     } catch (e) {
@@ -328,29 +386,29 @@ class VendorProvider extends ChangeNotifier {
   // Save authentication state
   Future<void> _saveAuthState() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      // Save tokens via SecureAuthService
       if (_authToken != null && _authToken!.isNotEmpty) {
-        await VendorApiService.saveAuthTokens(
+        await SecureAuthService.saveAuthSession(
           authToken: _authToken!,
           refreshToken: _refreshToken,
+          vendorData: _currentVendor != null
+              ? await _encodeJson(_currentVendor!.toJson())
+              : null,
         );
-      }
-
-      if (_currentVendor != null) {
-        await prefs.setString(
-          VendorConfig.vendorKey,
-          await _encodeJson(_currentVendor!.toJson()),
+        SecureLogger.info(
+          'Auth state saved: token=${_authToken != null}, vendor=${_currentVendor != null}',
+          tag: 'AUTH',
         );
       }
     } catch (e) {
-      SecureLogger.error('Failed to save auth state', error: e);
+      SecureLogger.error('Failed to save auth state', error: e, tag: 'AUTH');
     }
   }
 
   // Clear authentication state
   Future<void> _clearAuthState() async {
     try {
-      await VendorApiService.clearAuthSession();
+      await SecureAuthService.clearAuthSession();
 
       _authToken = null;
       _refreshToken = null;
@@ -646,21 +704,62 @@ class VendorProvider extends ChangeNotifier {
     Map<String, dynamic> productData, {
     List<File>? imageFiles,
   }) async {
-    if (!_isAuthenticated || _authToken == null || _currentVendor == null) {
+    SecureLogger.info('=== CREATE PRODUCT START ===', tag: 'PRODUCTS');
+
+    // Debug auth state
+    SecureLogger.info(
+      'TOKEN: ${_authToken != null ? "PRESENT" : "MISSING"} | '
+      'VENDOR: ${_currentVendor != null ? "PRESENT" : "MISSING"} | '
+      'AUTH: $_isAuthenticated',
+      tag: 'PRODUCTS',
+    );
+
+    // Validate token first
+    if (!_isAuthenticated || _authToken == null) {
+      _error = 'Not authenticated. Please login.';
+      SecureLogger.error(
+        'CREATE PRODUCT FAILED: No auth token',
+        tag: 'PRODUCTS',
+      );
       return false;
+    }
+
+    // If vendor is null but we have token, try to fetch it
+    if (_currentVendor == null) {
+      SecureLogger.info(
+        'Vendor missing, attempting to fetch...',
+        tag: 'PRODUCTS',
+      );
+      await loadVendorData();
+      if (_currentVendor == null) {
+        _error = 'Vendor profile not loaded. Please login again.';
+        SecureLogger.error(
+          'CREATE PRODUCT FAILED: Could not load vendor',
+          tag: 'PRODUCTS',
+        );
+        return false;
+      }
     }
 
     _setLoading(true);
     _error = null;
 
+    final hasImages = imageFiles != null && imageFiles.isNotEmpty;
+    SecureLogger.info(
+      'Has images: $hasImages, imageCount=${imageFiles?.length ?? 0}',
+      tag: 'PRODUCTS',
+    );
+
     try {
-      final newProduct = (imageFiles != null && imageFiles.isNotEmpty)
+      SecureLogger.info('Calling API service...', tag: 'PRODUCTS');
+      final newProduct = hasImages
           ? await VendorApiService.createProductWithImages(
               productData,
               imageFiles,
               _authToken!,
             )
           : await VendorApiService.createProduct(productData, _authToken!);
+      SecureLogger.info('API call completed successfully', tag: 'PRODUCTS');
 
       _products.insert(0, newProduct);
 
@@ -756,7 +855,7 @@ class VendorProvider extends ChangeNotifier {
         orderId,
         status,
         _authToken!,
-        notes: notes,
+        note: notes,
       );
 
       final index = _orders.indexWhere((o) => o.id == orderId);

@@ -48,7 +48,7 @@ class BackgroundNotificationHandler {
     );
 
     await _notifications.initialize(
-      settings,
+      settings: settings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
   }
@@ -101,10 +101,10 @@ class BackgroundNotificationHandler {
       );
 
       await _notifications.show(
-        notification.id.hashCode,
-        notification.title,
-        notification.body,
-        platformDetails,
+        id: notification.id.hashCode,
+        title: notification.title,
+        body: notification.body,
+        notificationDetails: platformDetails,
         payload: notification.id,
       );
 
@@ -128,7 +128,7 @@ class BackgroundNotificationHandler {
 
   /// Cancel specific notification
   Future<void> cancelNotification(String notificationId) async {
-    await _notifications.cancel(notificationId.hashCode);
+    await _notifications.cancel(id: notificationId.hashCode);
   }
 }
 

@@ -17,7 +17,7 @@ class VendorPayoutsTab extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.wait([
+        await Future.wait<void>([
           ref.read(payoutProvider.notifier).loadPayouts(),
           ref.read(ledgerProvider.notifier).loadLedger(silent: true),
         ]);

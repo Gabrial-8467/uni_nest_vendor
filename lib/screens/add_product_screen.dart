@@ -33,6 +33,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Ensure vendor provider is initialized to load auth token and vendor data
+    ref.read(vendorProviderProvider.notifier).initialize();
+  }
+
   final List<String> _categories = [
     'Snacks',
     'Beverages',
@@ -80,25 +87,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         );
       } else {
         debugPrint('📁 Requesting storage permission...');
-        hasPermission = await PermissionService.requestPermission(
-          Permission.storage,
-        );
+        // Use requestStoragePermission() which handles Android 13+ properly
+        hasPermission = await PermissionService.requestStoragePermission();
       }
 
       debugPrint('🔐 Permission granted: $hasPermission');
 
       if (!hasPermission) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                source == ImageSource.camera
-                    ? 'Camera permission is required to take photos'
-                    : 'Storage permission is required to select images',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showPermissionDeniedDialog(source);
         }
         return;
       }
@@ -163,6 +160,34 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         );
       }
     }
+  }
+
+  void _showPermissionDeniedDialog(ImageSource source) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permission Required'),
+        content: Text(
+          source == ImageSource.camera
+              ? 'Camera permission is needed to take photos. Please enable it in app settings.'
+              : 'Storage permission is needed to select images. Please enable it in app settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Open app settings
+              openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showImagePicker() {
@@ -240,15 +265,25 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       final stockQuantity = int.tryParse(_stockController.text.trim()) ?? 0;
       final normalizedCategory = _toApiCategory(_selectedCategory);
 
-      // Prepare product data
+      // Prepare product data with proper types
+      final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+      final discountPrice =
+          double.tryParse(_discountController.text.trim()) ?? 0.0;
+      final discountPercentage = (price > 0 && discountPrice > 0)
+          ? ((price - discountPrice) / price * 100).round()
+          : null;
+
       final productData = {
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'price': _priceController.text.trim(),
+        'price': price,
         'category': normalizedCategory,
-        'inStock': stockQuantity.toString(),
-        'isAvailable': _isAvailable.toString(),
-        'discountPrice': _discountController.text.trim(),
+        'inStock': stockQuantity,
+        'isAvailable': _isAvailable,
+        'isFeatured': _isFeatured,
+        ...?discountPercentage != null
+            ? {'discountPercentage': discountPercentage}
+            : null,
       };
 
       SecureLogger.info('Creating product with data: $productData');
@@ -558,33 +593,36 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         _buildSectionTitle('Product Images'),
         const SizedBox(height: 16),
         if (_productImageFiles.isEmpty)
-          Container(
-            width: double.infinity,
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.add_photo_alternate_outlined,
-                  size: 48,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Add product images',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap the + button below',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                ),
-              ],
+          InkWell(
+            onTap: _showImagePicker,
+            child: Container(
+              width: double.infinity,
+              height: 200,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_photo_alternate_outlined,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add product images',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to select images',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
             ),
           )
         else

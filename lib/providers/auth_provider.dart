@@ -43,18 +43,18 @@ class AuthState {
   }
 }
 
-class AuthController extends StateNotifier<AuthState> {
-  AuthController(this._read) : super(const AuthState());
+class AuthController extends Notifier<AuthState> {
+  @override
+  AuthState build() {
+    return const AuthState();
+  }
 
-  final Ref _read;
   bool _isDisposed = false;
 
-  VendorApiClient get _apiClient => _read.read(vendorApiClientProvider);
+  VendorApiClient get _apiClient => ref.read(vendorApiClientProvider);
 
-  @override
   void dispose() {
     _isDisposed = true;
-    super.dispose();
   }
 
   Future<void> bootstrap() async {
@@ -310,6 +310,6 @@ class AuthController extends StateNotifier<AuthState> {
   }
 }
 
-final authProvider = StateNotifierProvider<AuthController, AuthState>(
-  (ref) => AuthController(ref),
+final authProvider = NotifierProvider<AuthController, AuthState>(
+  AuthController.new,
 );

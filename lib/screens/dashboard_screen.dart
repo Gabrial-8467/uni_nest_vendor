@@ -32,7 +32,7 @@ class VendorDashboardTab extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.wait([
+        await Future.wait<void>([
           ref.read(orderProvider.notifier).loadOrders(),
           ref.read(ledgerProvider.notifier).loadLedger(),
           ref.read(payoutProvider.notifier).loadPayouts(),

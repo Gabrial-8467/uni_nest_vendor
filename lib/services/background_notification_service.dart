@@ -28,7 +28,7 @@ class BackgroundNotificationService {
           InitializationSettings(android: _androidSettings);
 
       await _notificationsPlugin.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
 
@@ -103,10 +103,10 @@ class BackgroundNotificationService {
       );
 
       await _notificationsPlugin.show(
-        notification.id.hashCode,
-        notification.title,
-        notification.body,
-        notificationDetails,
+        id: notification.id.hashCode,
+        title: notification.title,
+        body: notification.body,
+        notificationDetails: notificationDetails,
         payload: jsonEncode({
           'id': notification.id,
           'type': notification.type,
@@ -171,8 +171,8 @@ class BackgroundNotificationService {
   }
 
   /// Cancel specific notification
-  static Future<void> cancelNotification(int id) async {
-    await _notificationsPlugin.cancel(id);
+  static Future<void> cancelNotification(String notificationId) async {
+    await _notificationsPlugin.cancel(id: notificationId.hashCode);
   }
 
   /// Cancel all notifications

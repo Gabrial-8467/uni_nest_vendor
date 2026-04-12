@@ -35,7 +35,7 @@ class VendorNotificationScreen extends ConsumerWidget {
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     WidgetRef ref,
-    NotificationState state,
+    VendorNotificationState state,
     int unreadCount,
   ) {
     return AppBar(
@@ -138,7 +138,7 @@ class VendorNotificationScreen extends ConsumerWidget {
   Widget _buildBody(
     BuildContext context,
     WidgetRef ref,
-    NotificationState state,
+    VendorNotificationState state,
   ) {
     if (state.isLoading) {
       return _buildLoadingState();
