@@ -385,13 +385,24 @@ class VendorApiService {
     }
   }
 
-  static Future<List<Product>> getVendorProducts(String authToken) async {
+  static Future<List<Product>> getVendorProducts(
+    String authToken, {
+    String? status,
+  }) async {
+    final endpoint = status != null
+        ? '${ApiEndpoints.products}?status=$status'
+        : ApiEndpoints.products;
+    SecureLogger.info('Fetching products from: $endpoint', tag: 'PRODUCTS');
     final response = await _makeRequest(
       ApiMethods.get,
-      ApiEndpoints.products,
+      endpoint,
       authTokenOverride: authToken,
     );
     final rawData = response['data'];
+    SecureLogger.info(
+      'Response data type: ${rawData.runtimeType}',
+      tag: 'PRODUCTS',
+    );
 
     List<dynamic> rawProducts;
     if (rawData is List) {
@@ -404,10 +415,21 @@ class VendorApiService {
       rawProducts = <dynamic>[];
     }
 
-    return rawProducts
+    SecureLogger.info(
+      'Raw products count: ${rawProducts.length}',
+      tag: 'PRODUCTS',
+    );
+
+    final products = rawProducts
         .whereType<Map>()
         .map((product) => Product.fromJson(Map<String, dynamic>.from(product)))
         .toList();
+
+    SecureLogger.info(
+      'Parsed products count: ${products.length}',
+      tag: 'PRODUCTS',
+    );
+    return products;
   }
 
   static Future<Product> createProduct(
