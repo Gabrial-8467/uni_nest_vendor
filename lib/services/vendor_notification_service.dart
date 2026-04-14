@@ -14,7 +14,7 @@ class VendorNotificationService {
   /// Get all notifications for the vendor
   static Future<List<VendorNotification>> getNotifications() async {
     try {
-      final response = await _makeRequest('GET', '/api/vendor/notifications');
+      final response = await _makeRequest('GET', '/notifications');
 
       if (response['success'] == true && response['data'] != null) {
         final notificationsData = response['data'] as List? ?? [];
@@ -38,7 +38,7 @@ class VendorNotificationService {
   /// Mark all notifications as read
   static Future<void> markAllRead() async {
     try {
-      await _makeRequest('POST', '/api/vendor/notifications/read-all');
+      await _makeRequest('PUT', '/notifications/mark-all-read');
 
       debugPrint('Marked all notifications as read');
     } catch (e) {
@@ -50,10 +50,7 @@ class VendorNotificationService {
   /// Mark a specific notification as read
   static Future<void> markAsRead(String notificationId) async {
     try {
-      await _makeRequest(
-        'POST',
-        '/api/vendor/notifications/$notificationId/read',
-      );
+      await _makeRequest('PUT', '/notifications/$notificationId/read');
 
       debugPrint('Marked notification $notificationId as read');
     } catch (e) {
@@ -65,7 +62,7 @@ class VendorNotificationService {
   /// Delete a specific notification
   static Future<void> deleteNotification(String notificationId) async {
     try {
-      await _makeRequest('DELETE', '/api/vendor/notifications/$notificationId');
+      await _makeRequest('DELETE', '/notifications/$notificationId');
 
       debugPrint('Deleted notification $notificationId');
     } catch (e) {

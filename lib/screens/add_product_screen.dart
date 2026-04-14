@@ -278,8 +278,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'description': _descriptionController.text.trim(),
         'price': price,
         'category': normalizedCategory,
-        'inStock': stockQuantity,
-        'isAvailable': _isAvailable,
+        'stock': stockQuantity,
+        'availability': stockQuantity > 0 ? 'in_stock' : 'out_of_stock',
         'isFeatured': _isFeatured,
         ...?discountPercentage != null
             ? {'discountPercentage': discountPercentage}
@@ -338,18 +338,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         foregroundColor: AppTheme.textPrimary,
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _submitForm,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Save'),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -466,15 +454,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _stockController,
-                label: 'Stock Quantity',
+                label: 'Stock Quantity (Optional)',
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Stock quantity is required';
-                  }
-                  final stock = int.tryParse(value);
-                  if (stock == null || stock < 0) {
-                    return 'Please enter a valid stock quantity';
+                  if (value != null && value.trim().isNotEmpty) {
+                    final stock = int.tryParse(value);
+                    if (stock == null || stock < 0) {
+                      return 'Please enter a valid stock quantity';
+                    }
                   }
                   return null;
                 },

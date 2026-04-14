@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/vendor_config.dart';
 import '../models/auth_models.dart';
 import '../models/ledger_models.dart';
 import '../models/order_models.dart';
+import '../services/secure_auth_service.dart';
 
 class VendorApiException implements Exception {
   VendorApiException(this.message, {this.statusCode, this.payload});
@@ -20,13 +20,10 @@ class VendorApiException implements Exception {
 }
 
 class VendorApiClient {
-  VendorApiClient(this._storage);
+  VendorApiClient([
+    dynamic legacyStorage,
+  ]); // Parameter kept for backward compatibility
 
-  static const _accessTokenKey = 'vendor_panel_access_token';
-  static const _refreshTokenKey = 'vendor_panel_refresh_token';
-  static const _sessionKey = 'vendor_panel_session';
-
-  final FlutterSecureStorage _storage;
   final http.Client _httpClient = http.Client();
   final Map<String, _CachedResponse> _getCache = {};
 
@@ -34,14 +31,30 @@ class VendorApiClient {
   static const Duration _cacheTtl = Duration(seconds: 15);
 
   Future<AuthSession?> restoreSession() async {
-    final raw = await _storage.read(key: _sessionKey);
-    if (raw == null || raw.isEmpty) {
+    // Use SecureAuthService for consistent token storage
+    final token = await SecureAuthService.getAuthToken();
+    final refreshToken = await SecureAuthService.getRefreshToken();
+    final vendorData = await SecureAuthService.getVendorData();
+
+    if (token == null || token.isEmpty) {
       return null;
     }
 
     try {
-      return AuthSession.fromJson(
-        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      VendorProfile profile;
+      if (vendorData != null) {
+        final data = Map<String, dynamic>.from(jsonDecode(vendorData) as Map);
+        profile = VendorProfile.fromJson(data);
+      } else {
+        // Fetch profile from API if not stored
+        profile = await getProfile();
+        // Save it for next time
+        await SecureAuthService.saveVendorData(jsonEncode(profile.toJson()));
+      }
+      return AuthSession(
+        accessToken: token,
+        refreshToken: refreshToken,
+        profile: profile,
       );
     } catch (_) {
       await clearSession();
@@ -50,20 +63,18 @@ class VendorApiClient {
   }
 
   Future<void> persistSession(AuthSession session) async {
-    await _storage.write(key: _accessTokenKey, value: session.accessToken);
-    if (session.refreshToken != null && session.refreshToken!.isNotEmpty) {
-      await _storage.write(key: _refreshTokenKey, value: session.refreshToken);
-    }
-    await _storage.write(key: _sessionKey, value: jsonEncode(session.toJson()));
+    await SecureAuthService.saveAuthSession(
+      authToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      vendorData: jsonEncode(session.profile.toJson()),
+    );
   }
 
   Future<void> clearSession() async {
-    await _storage.delete(key: _accessTokenKey);
-    await _storage.delete(key: _refreshTokenKey);
-    await _storage.delete(key: _sessionKey);
+    await SecureAuthService.clearAuthSession();
   }
 
-  Future<String?> getAccessToken() => _storage.read(key: _accessTokenKey);
+  Future<String?> getAccessToken() => SecureAuthService.getAuthToken();
 
   Future<AuthSession> login({
     required String email,

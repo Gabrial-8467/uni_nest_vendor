@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/vendor_config.dart';
 import '../utils/secure_logger.dart';
+import 'secure_auth_service.dart';
 import 'vendor_api_service.dart';
 
 class AuthService {
@@ -11,7 +10,6 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   Timer? _sessionTimer;
   DateTime? _lastActivity;
 
@@ -44,12 +42,8 @@ class AuthService {
     try {
       _sessionTimer?.cancel();
 
-      // Clear secure storage
-      await _secureStorage.deleteAll();
-
-      // Clear shared preferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      // Clear all auth data via SecureAuthService
+      await SecureAuthService.clearAuthSession();
 
       SecureLogger.info('User logged out successfully', tag: 'AUTH');
     } catch (e) {
@@ -57,35 +51,13 @@ class AuthService {
     }
   }
 
-  // Token Management
+  // Token Management - delegated to SecureAuthService
   Future<String?> getAuthToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final sharedPrefsToken = prefs.getString(VendorConfig.tokenKey);
-      if (sharedPrefsToken != null && sharedPrefsToken.isNotEmpty) {
-        return sharedPrefsToken;
-      }
-
-      return await _secureStorage.read(key: VendorConfig.tokenKey);
-    } catch (e) {
-      SecureLogger.error('Failed to get auth token', error: e);
-      return null;
-    }
+    return await SecureAuthService.getAuthToken();
   }
 
   Future<String?> getRefreshToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final sharedPrefsToken = prefs.getString(VendorConfig.refreshTokenKey);
-      if (sharedPrefsToken != null && sharedPrefsToken.isNotEmpty) {
-        return sharedPrefsToken;
-      }
-
-      return await _secureStorage.read(key: VendorConfig.refreshTokenKey);
-    } catch (e) {
-      SecureLogger.error('Failed to get refresh token', error: e);
-      return null;
-    }
+    return await SecureAuthService.getRefreshToken();
   }
 
   Future<void> saveTokens({
@@ -93,14 +65,9 @@ class AuthService {
     required String refreshToken,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(VendorConfig.tokenKey, authToken);
-      await prefs.setString(VendorConfig.refreshTokenKey, refreshToken);
-
-      await _secureStorage.write(key: VendorConfig.tokenKey, value: authToken);
-      await _secureStorage.write(
-        key: VendorConfig.refreshTokenKey,
-        value: refreshToken,
+      await SecureAuthService.saveAuthSession(
+        authToken: authToken,
+        refreshToken: refreshToken,
       );
 
       startSessionTimer();
@@ -199,14 +166,12 @@ class AuthService {
     return null;
   }
 
-  // User Data Management
+  // User Data Management - delegated to SecureAuthService
   Future<Map<String, dynamic>?> getUserData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userData = prefs.getString(VendorConfig.vendorKey);
-
-      if (userData != null) {
-        return jsonDecode(userData);
+      final vendorData = await SecureAuthService.getVendorData();
+      if (vendorData != null) {
+        return jsonDecode(vendorData);
       }
       return null;
     } catch (e) {
@@ -217,8 +182,7 @@ class AuthService {
 
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(VendorConfig.vendorKey, jsonEncode(userData));
+      await SecureAuthService.saveVendorData(jsonEncode(userData));
       SecureLogger.info('User data saved successfully', tag: 'AUTH');
     } catch (e) {
       SecureLogger.error('Failed to save user data', error: e);
@@ -229,33 +193,10 @@ class AuthService {
   // Security Methods
   Future<void> clearSensitiveData() async {
     try {
-      await _secureStorage.deleteAll();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(VendorConfig.vendorKey);
-
+      await SecureAuthService.clearAuthSession();
       SecureLogger.info('Sensitive data cleared', tag: 'AUTH');
     } catch (e) {
       SecureLogger.error('Failed to clear sensitive data', error: e);
-    }
-  }
-
-  Future<bool> isBiometricAvailable() async {
-    try {
-      // Check if device supports biometrics
-      final canAuthenticate = await _secureStorage.read(key: 'biometric_check');
-      return canAuthenticate == 'available';
-    } catch (e) {
-      SecureLogger.error('Biometric availability check failed', error: e);
-      return false;
-    }
-  }
-
-  Future<void> enableBiometricAuth() async {
-    try {
-      await _secureStorage.write(key: 'biometric_check', value: 'available');
-      SecureLogger.info('Biometric auth enabled', tag: 'AUTH');
-    } catch (e) {
-      SecureLogger.error('Failed to enable biometric auth', error: e);
     }
   }
 

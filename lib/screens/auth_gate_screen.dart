@@ -24,7 +24,9 @@ class _VendorAuthGateScreenState extends ConsumerState<VendorAuthGateScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    if (!authState.didBootstrap || authState.isLoading) {
+    // Only show full-screen loading during initial bootstrap (app startup)
+    // NOT during login operations - login screen handles its own button loading
+    if (!authState.didBootstrap) {
       return const Scaffold(
         backgroundColor: AppTheme.primary,
         body: Center(child: CircularProgressIndicator(color: Colors.white)),

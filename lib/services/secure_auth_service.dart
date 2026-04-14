@@ -7,10 +7,11 @@ import '../utils/secure_logger.dart';
 /// Secure authentication service using FlutterSecureStorage
 /// Provides token persistence with encryption
 class SecureAuthService {
-  static const String _authTokenKey = 'auth_token';
-  static const String _refreshTokenKey = 'refresh_token';
-  static const String _vendorDataKey = 'vendor_data';
-  static const String _tokenExpiryKey = 'token_expiry';
+  // Use VendorConfig keys for consistency across the app
+  static String get _authTokenKey => VendorConfig.tokenKey;
+  static String get _refreshTokenKey => VendorConfig.refreshTokenKey;
+  static String get _vendorDataKey => VendorConfig.vendorKey;
+  static String get _tokenExpiryKey => '${VendorConfig.tokenKey}_expiry';
 
   // Secure storage with iOS/Android specific options
   static const FlutterSecureStorage _storage = FlutterSecureStorage(
@@ -225,16 +226,32 @@ class SecureAuthService {
     }
   }
 
-  /// Clear all auth data from secure storage
+  /// Clear all auth data from both secure storage and SharedPreferences
   static Future<void> clearAuthSession() async {
     try {
+      // Clear secure storage
       await _storage.delete(key: _authTokenKey);
       await _storage.delete(key: _refreshTokenKey);
       await _storage.delete(key: _vendorDataKey);
       await _storage.delete(key: _tokenExpiryKey);
 
+      // Also clear SharedPreferences fallback to ensure complete logout
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(VendorConfig.tokenKey);
+        await prefs.remove(VendorConfig.refreshTokenKey);
+        await prefs.remove(VendorConfig.vendorKey);
+        await prefs.remove(_tokenExpiryKey);
+      } catch (ePrefs) {
+        SecureLogger.error(
+          'Failed to clear SharedPreferences during logout',
+          error: ePrefs,
+          tag: 'AUTH_STORAGE',
+        );
+      }
+
       SecureLogger.info(
-        'Auth session cleared from secure storage',
+        'Auth session cleared from all storage',
         tag: 'AUTH_STORAGE',
       );
     } catch (e) {
