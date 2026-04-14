@@ -15,7 +15,7 @@ import 'orders_screen.dart';
 import 'products_screen.dart';
 import 'analytics_screen.dart';
 import 'vendor_profile_screen.dart';
-import 'vendor_notifications_screen.dart';
+import 'vendor_notification_screen.dart';
 
 // =============================================================================
 // VENDOR DASHBOARD SCREEN (LEGACY)
@@ -217,7 +217,7 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const VendorNotificationsScreen(),
+                    builder: (context) => const VendorNotificationScreen(),
                   ),
                 );
                 await _loadUnreadNotificationStatus(force: true);

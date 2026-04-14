@@ -220,10 +220,12 @@ class VendorProvider extends ChangeNotifier {
   }
 
   Future<bool> _ensureAuthenticatedSession() async {
-    if (!_isAuthenticated || _currentVendor == null) {
+    // Only check auth token, not vendor data (vendor may need to be fetched)
+    if (!_isAuthenticated || _authToken == null) {
       return false;
     }
 
+    // Verify token exists in storage
     final storedToken = await VendorApiService.getAuthToken();
     if (storedToken == null || storedToken.isEmpty) {
       SecureLogger.error(
@@ -706,16 +708,20 @@ class VendorProvider extends ChangeNotifier {
   }) async {
     SecureLogger.info('=== CREATE PRODUCT START ===', tag: 'PRODUCTS');
 
-    // Debug auth state
-    SecureLogger.info(
-      'TOKEN: ${_authToken != null ? "PRESENT" : "MISSING"} | '
-      'VENDOR: ${_currentVendor != null ? "PRESENT" : "MISSING"} | '
-      'AUTH: $_isAuthenticated',
-      tag: 'PRODUCTS',
-    );
+    // Try to get token directly from secure storage if not in memory
+    String? effectiveToken = _authToken;
+    if (effectiveToken == null || effectiveToken.isEmpty) {
+      // Use the API service helper to retrieve the token, which handles fallback and migration
+      effectiveToken = await VendorApiService.getAuthToken();
+      if (effectiveToken != null && effectiveToken.isNotEmpty) {
+        _authToken = effectiveToken;
+        _isAuthenticated = true;
+        SecureLogger.info('Token loaded via VendorApiService', tag: 'PRODUCTS');
+      }
+    }
 
-    // Validate token first
-    if (!_isAuthenticated || _authToken == null) {
+    // Validate token
+    if (effectiveToken == null || effectiveToken.isEmpty) {
       _error = 'Not authenticated. Please login.';
       SecureLogger.error(
         'CREATE PRODUCT FAILED: No auth token',
@@ -724,13 +730,13 @@ class VendorProvider extends ChangeNotifier {
       return false;
     }
 
-    // If vendor is null but we have token, try to fetch it
+    // If vendor is null, try to fetch it
     if (_currentVendor == null) {
       SecureLogger.info(
         'Vendor missing, attempting to fetch...',
         tag: 'PRODUCTS',
       );
-      await loadVendorData();
+      await loadVendorProfile();
       if (_currentVendor == null) {
         _error = 'Vendor profile not loaded. Please login again.';
         SecureLogger.error(
@@ -756,9 +762,9 @@ class VendorProvider extends ChangeNotifier {
           ? await VendorApiService.createProductWithImages(
               productData,
               imageFiles,
-              _authToken!,
+              effectiveToken,
             )
-          : await VendorApiService.createProduct(productData, _authToken!);
+          : await VendorApiService.createProduct(productData, effectiveToken);
       SecureLogger.info('API call completed successfully', tag: 'PRODUCTS');
 
       _products.insert(0, newProduct);

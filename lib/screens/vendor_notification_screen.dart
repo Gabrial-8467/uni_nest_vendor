@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vendor_notification.dart';
 import '../providers/vendor_notification_provider.dart';
-import '../services/background_notification_service.dart';
 import '../utils/app_theme.dart';
 import 'order_details_screen.dart';
 import 'payment_details_screen.dart';
@@ -15,9 +14,6 @@ class VendorNotificationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Set ref for background notification handler
-    BackgroundNotificationHandler.setRef(ref);
-
     final state = ref.watch(vendorNotificationProvider);
     final unreadCount = ref.watch(unreadCountProvider);
 

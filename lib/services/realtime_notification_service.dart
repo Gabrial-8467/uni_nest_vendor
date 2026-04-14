@@ -6,7 +6,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../models/vendor_notification.dart';
 import '../providers/vendor_notification_provider.dart';
-import 'background_notification_service.dart';
 
 /// Real-time notification service using WebSocket
 class RealtimeNotificationService {
@@ -68,9 +67,6 @@ class RealtimeNotificationService {
           data['data'] as Map<String, dynamic>,
         );
         _notificationController?.add(notification);
-
-        // Show background notification
-        BackgroundNotificationService.showBackgroundNotification(notification);
 
         // Add to provider if ref is available
         if (_ref != null) {

@@ -8,14 +8,15 @@ import '../../utils/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/payout_provider.dart';
-import '../providers/notification_provider.dart';
+import '../providers/vendor_notification_provider.dart';
 import '../providers/order_provider.dart';
 import 'dashboard_screen.dart';
 import 'ledger_screen.dart';
 import 'orders_screen.dart';
 import 'vendor_profile_screen.dart';
 import 'payouts_screen.dart';
-import 'notification_screen.dart';
+import 'vendor_notification_screen.dart';
+import '../widgets/toast_notification_listener.dart';
 
 class VendorShellScreen extends ConsumerStatefulWidget {
   const VendorShellScreen({super.key});
@@ -41,7 +42,7 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const NotificationScreen()),
+      MaterialPageRoute(builder: (context) => const VendorNotificationScreen()),
     );
   }
 
@@ -72,8 +73,8 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
       }
 
       try {
-        await ref.read(notificationProvider.notifier).loadNotifications();
-        ref.read(notificationProvider.notifier).startPolling();
+        await ref.read(vendorNotificationProvider.notifier).loadNotifications();
+        ref.read(vendorNotificationProvider.notifier).startPolling();
       } catch (e) {
         // Handle notification loading errors
       }
@@ -108,7 +109,7 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
     // Stop polling when widget is disposed - check mounted to avoid errors
     if (mounted) {
       try {
-        ref.read(notificationProvider.notifier).stopPolling();
+        ref.read(vendorNotificationProvider.notifier).stopPolling();
       } catch (e) {
         // Ignore errors if provider is already disposed
       }
@@ -118,7 +119,7 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final notifications = ref.watch(notificationProvider);
+    final notifications = ref.watch(vendorNotificationProvider);
     final pages = const [
       VendorDashboardTab(),
       VendorOrdersTab(),
@@ -127,167 +128,169 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
       VendorProfileTab(),
     ];
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface,
-        elevation: 0,
-        centerTitle: true,
-        titleSpacing: 16,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Image.asset(AppAssets.logoImage, height: 28),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'UNINEST',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(
-                        Icons.store_outlined,
-                        size: 12,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Vendor Portal',
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          // Enhanced notification bell with badge
-          Stack(
+    return ToastNotificationListener(
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          backgroundColor: AppTheme.surface,
+          elevation: 0,
+          centerTitle: true,
+          titleSpacing: 16,
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Container(
-                margin: const EdgeInsets.only(right: 16),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.notifications_outlined,
-                    color: AppTheme.textSecondary,
-                  ),
-                  onPressed: _showNotificationDialog,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.background,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                  ),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Image.asset(AppAssets.logoImage, height: 28),
               ),
-              if (notifications.unreadCount > 0)
-                Positioned(
-                  right: 20,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
-                    child: Text(
-                      notifications.unreadCount > 99
-                          ? '99+'
-                          : notifications.unreadCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'UNINEST',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Icon(
+                          Icons.store_outlined,
+                          size: 12,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Vendor Portal',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
-      body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+          actions: [
+            // Enhanced notification bell with badge
+            Stack(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.notifications_outlined,
+                      color: AppTheme.textSecondary,
+                    ),
+                    onPressed: _showNotificationDialog,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.background,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ),
+                if (notifications.unreadCount > 0)
+                  Positioned(
+                    right: 20,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        notifications.unreadCount > 99
+                            ? '99+'
+                            : notifications.unreadCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  icon: Icons.dashboard_outlined,
-                  label: 'Dashboard',
-                  index: 0,
-                  isSelected: _index == 0,
-                ),
-                _buildNavItem(
-                  icon: Icons.receipt_long_outlined,
-                  label: 'Orders',
-                  index: 1,
-                  isSelected: _index == 1,
-                ),
-                _buildNavItem(
-                  icon: Icons.account_balance_wallet_outlined,
-                  label: 'Ledger',
-                  index: 2,
-                  isSelected: _index == 2,
-                ),
-                _buildNavItem(
-                  icon: Icons.payments_outlined,
-                  label: 'Payouts',
-                  index: 3,
-                  isSelected: _index == 3,
-                ),
-                _buildNavItem(
-                  icon: Icons.person_outline,
-                  label: 'Profile',
-                  index: 4,
-                  isSelected: _index == 4,
-                ),
-              ],
+        body: IndexedStack(index: _index, children: pages),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    index: 0,
+                    isSelected: _index == 0,
+                  ),
+                  _buildNavItem(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Orders',
+                    index: 1,
+                    isSelected: _index == 1,
+                  ),
+                  _buildNavItem(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Ledger',
+                    index: 2,
+                    isSelected: _index == 2,
+                  ),
+                  _buildNavItem(
+                    icon: Icons.payments_outlined,
+                    label: 'Payouts',
+                    index: 3,
+                    isSelected: _index == 3,
+                  ),
+                  _buildNavItem(
+                    icon: Icons.person_outline,
+                    label: 'Profile',
+                    index: 4,
+                    isSelected: _index == 4,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

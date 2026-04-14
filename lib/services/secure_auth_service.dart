@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../config/vendor_config.dart';
 import '../utils/secure_logger.dart';
 
 /// Secure authentication service using FlutterSecureStorage
@@ -16,7 +18,10 @@ class SecureAuthService {
       accountName: 'secure_auth_tokens',
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),
-    aOptions: AndroidOptions(),
+    aOptions: AndroidOptions(
+      keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
+      storageCipherAlgorithm: StorageCipherAlgorithm.AES_CBC_PKCS7Padding,
+    ),
   );
 
   /// Save authentication tokens securely
@@ -27,20 +32,45 @@ class SecureAuthService {
     DateTime? tokenExpiry,
   }) async {
     try {
+      // Write to secure storage first
       await _storage.write(key: _authTokenKey, value: authToken);
-
       if (refreshToken != null && refreshToken.isNotEmpty) {
         await _storage.write(key: _refreshTokenKey, value: refreshToken);
       }
-
       if (vendorData != null && vendorData.isNotEmpty) {
         await _storage.write(key: _vendorDataKey, value: vendorData);
       }
-
       if (tokenExpiry != null) {
         await _storage.write(
           key: _tokenExpiryKey,
           value: tokenExpiry.toIso8601String(),
+        );
+      }
+
+      // Also persist a fallback copy in SharedPreferences for platforms where
+      // FlutterSecureStorage may not be available (e.g., desktop/web). This ensures
+      // the token can be retrieved via the SharedPreferences fallback path.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(VendorConfig.tokenKey, authToken);
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await prefs.setString(VendorConfig.refreshTokenKey, refreshToken);
+        }
+        if (vendorData != null && vendorData.isNotEmpty) {
+          await prefs.setString(VendorConfig.vendorKey, vendorData);
+        }
+        if (tokenExpiry != null) {
+          await prefs.setString(
+            '${VendorConfig.tokenKey}_expiry',
+            tokenExpiry.toIso8601String(),
+          );
+        }
+      } catch (ePrefs) {
+        // Do not fail the whole operation if SharedPreferences write fails.
+        SecureLogger.error(
+          'Failed to write token fallback to SharedPreferences',
+          error: ePrefs,
+          tag: 'AUTH_STORAGE',
         );
       }
 
@@ -58,15 +88,31 @@ class SecureAuthService {
     }
   }
 
-  /// Get auth token from secure storage
+  /// Get auth token from secure storage (with SharedPreferences fallback)
   static Future<String?> getAuthToken() async {
     try {
+      // Try secure storage first
       final token = await _storage.read(key: _authTokenKey);
-      SecureLogger.info(
-        'Token ${token != null ? 'found' : 'NOT FOUND'} in secure storage',
-        tag: 'AUTH_STORAGE',
-      );
-      return token;
+      if (token != null && token.isNotEmpty) {
+        SecureLogger.info('Token found in secure storage', tag: 'AUTH_STORAGE');
+        return token;
+      }
+
+      // Fallback: check SharedPreferences for backward compatibility
+      final prefs = await SharedPreferences.getInstance();
+      final legacyToken = prefs.getString(VendorConfig.tokenKey);
+      if (legacyToken != null && legacyToken.isNotEmpty) {
+        SecureLogger.info(
+          'Token found in SharedPreferences, migrating to secure storage',
+          tag: 'AUTH_STORAGE',
+        );
+        // Migrate to secure storage
+        await _storage.write(key: _authTokenKey, value: legacyToken);
+        return legacyToken;
+      }
+
+      SecureLogger.info('Token NOT FOUND in any storage', tag: 'AUTH_STORAGE');
+      return null;
     } catch (e) {
       SecureLogger.error(
         'Failed to read auth token',
@@ -77,10 +123,23 @@ class SecureAuthService {
     }
   }
 
-  /// Get refresh token from secure storage
+  /// Get refresh token from secure storage (with SharedPreferences fallback)
   static Future<String?> getRefreshToken() async {
     try {
-      return await _storage.read(key: _refreshTokenKey);
+      // Try secure storage first
+      final token = await _storage.read(key: _refreshTokenKey);
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+
+      // Fallback: check SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final legacyToken = prefs.getString(VendorConfig.refreshTokenKey);
+      if (legacyToken != null && legacyToken.isNotEmpty) {
+        await _storage.write(key: _refreshTokenKey, value: legacyToken);
+        return legacyToken;
+      }
+      return null;
     } catch (e) {
       SecureLogger.error(
         'Failed to read refresh token',
@@ -91,15 +150,36 @@ class SecureAuthService {
     }
   }
 
-  /// Get vendor data from secure storage
+  /// Get vendor data from secure storage (with SharedPreferences fallback)
   static Future<String?> getVendorData() async {
     try {
+      // Try secure storage first
       final data = await _storage.read(key: _vendorDataKey);
+      if (data != null && data.isNotEmpty) {
+        SecureLogger.info(
+          'Vendor data found in secure storage',
+          tag: 'AUTH_STORAGE',
+        );
+        return data;
+      }
+
+      // Fallback: check SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final legacyData = prefs.getString(VendorConfig.vendorKey);
+      if (legacyData != null && legacyData.isNotEmpty) {
+        SecureLogger.info(
+          'Vendor data found in SharedPreferences, migrating',
+          tag: 'AUTH_STORAGE',
+        );
+        await _storage.write(key: _vendorDataKey, value: legacyData);
+        return legacyData;
+      }
+
       SecureLogger.info(
-        'Vendor data ${data != null ? 'found' : 'NOT FOUND'} in secure storage',
+        'Vendor data NOT FOUND in any storage',
         tag: 'AUTH_STORAGE',
       );
-      return data;
+      return null;
     } catch (e) {
       SecureLogger.error(
         'Failed to read vendor data',

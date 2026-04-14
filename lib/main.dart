@@ -39,7 +39,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/vendor_config.dart';
 import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
-import 'services/background_notification_service.dart';
 import 'services/cache_service.dart';
 import 'services/permission_service.dart';
 import 'services/update_service.dart';
@@ -107,12 +106,6 @@ Future<void> _initializeServices() async {
     await PermissionService.initializePermissions();
   } catch (e) {
     debugPrint('Permission service initialization failed: $e');
-  }
-
-  try {
-    await BackgroundNotificationHandler.initialize();
-  } catch (e) {
-    debugPrint('Background notification service initialization failed: $e');
   }
 }
 
