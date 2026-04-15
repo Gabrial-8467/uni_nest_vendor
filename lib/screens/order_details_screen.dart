@@ -8,17 +8,42 @@ import '../providers/order_provider.dart';
 import '../widgets/otp_verify_sheet.dart';
 import '../widgets/status_chip.dart';
 
-class OrderDetailsScreen extends ConsumerWidget {
+class OrderDetailsScreen extends ConsumerStatefulWidget {
   const OrderDetailsScreen({super.key, required this.orderId});
 
   final String orderId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
+}
+
+class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
+  bool _isBootstrappingOrder = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() async {
+      final state = ref.read(orderProvider);
+      final exists = state.orders.any((item) => item.id == widget.orderId);
+      if (!exists) {
+        await ref.read(orderProvider.notifier).fetchOrderById(widget.orderId);
+      }
+      if (mounted) {
+        setState(() {
+          _isBootstrappingOrder = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orderId = widget.orderId;
     final state = ref.watch(orderProvider);
     VendorOrder? order;
     for (final item in state.orders) {
-      if (item.id == orderId) {
+      if (item.id == orderId || item.orderNumber == orderId) {
         order = item;
         break;
       }
@@ -27,7 +52,11 @@ class OrderDetailsScreen extends ConsumerWidget {
     if (order == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Order details')),
-        body: const Center(child: Text('Order not found')),
+        body: Center(
+          child: _isBootstrappingOrder
+              ? const CircularProgressIndicator()
+              : const Text('Order not found'),
+        ),
       );
     }
 

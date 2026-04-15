@@ -56,7 +56,9 @@ String _resolveImageUrl(String rawPath, {String? cacheBustKey}) =>
 // =============================================================================
 
 class ProductsScreen extends ConsumerStatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
@@ -67,6 +69,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   String _selectedCategory = 'All';
   late final VoidCallback _searchListener;
   Timer? _searchDebounce;
+  bool _hasRequestedInitialLoad = false;
   static const Map<String, List<String>> _categoryAliases = {
     'Snacks': ['snacks', 'snack'],
     'Beverages': ['beverages', 'beverage', 'drinks', 'drink'],
@@ -103,6 +106,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   @override
   void initState() {
     super.initState();
+    Future.microtask(_loadProducts);
     _searchListener = () {
       _searchDebounce?.cancel();
       _searchDebounce = Timer(const Duration(milliseconds: 180), () {
@@ -114,6 +118,21 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     _searchController.addListener(_searchListener);
   }
 
+  Future<void> _loadProducts({bool force = false}) async {
+    if (_hasRequestedInitialLoad && !force) {
+      return;
+    }
+
+    _hasRequestedInitialLoad = true;
+    final vendorProvider = ref.read(vendorProviderProvider);
+
+    if (!vendorProvider.isAuthenticated) {
+      await vendorProvider.initialize();
+    }
+
+    await vendorProvider.loadProducts(force: force);
+  }
+
   @override
   void dispose() {
     _searchDebounce?.cancel();
@@ -122,18 +141,24 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     super.dispose();
   }
 
-  void _showAddProductDialog() {
-    Navigator.push(
+  Future<void> _showAddProductDialog() async {
+    final didChange = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (context) => const AddProductScreen()),
     );
+    if (mounted && didChange != true) {
+      await _loadProducts();
+    }
   }
 
-  void _showEditProductDialog(dynamic product) {
-    showDialog(
+  Future<void> _showEditProductDialog(dynamic product) async {
+    final didChange = await showDialog<bool>(
       context: context,
       builder: (context) => AddProductDialog(product: product),
     );
+    if (mounted && didChange != true) {
+      await _loadProducts();
+    }
   }
 
   void _showDeleteConfirmDialog(dynamic product) {
@@ -212,139 +237,201 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface,
-        elevation: 0,
-        foregroundColor: AppTheme.textPrimary,
-        toolbarHeight: 10,
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              backgroundColor: AppTheme.surface,
+              elevation: 0,
+              foregroundColor: AppTheme.textPrimary,
+              titleSpacing: 16,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Manage Products',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    vendorProvider.isLoadingProducts
+                        ? 'Loading your catalog...'
+                        : '${vendorProvider.products.length} product${vendorProvider.products.length == 1 ? '' : 's'} in your catalog',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Refresh products',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: vendorProvider.isLoadingProducts
+                      ? null
+                      : () => _loadProducts(force: true),
+                ),
+              ],
+            )
+          : null,
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddProductDialog,
         backgroundColor: AppTheme.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
-      body: Column(
-        children: [
-          // Search and Filter
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search products...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchController.text.trim().isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => _searchController.clear(),
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppTheme.primary),
+      body: RefreshIndicator(
+        onRefresh: () => _loadProducts(force: true),
+        color: AppTheme.primary,
+        child: Column(
+          children: [
+            // Search and Filter
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search products...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchController.text.trim().isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => _searchController.clear(),
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppTheme.primary),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Category Filter
-                SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children:
-                        [
-                          'All',
-                          'Snacks',
-                          'Beverages',
-                          'South Indian',
-                          'North Indian',
-                          'Chinese',
-                          'Desserts',
-                        ].map((category) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(category),
-                              selected: _selectedCategory == category,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _selectedCategory = selected
-                                      ? category
-                                      : 'All';
-                                });
-                              },
-                              backgroundColor: Colors.white,
-                              selectedColor: AppTheme.primary,
-                            ),
-                          );
-                        }).toList(),
+                  const SizedBox(height: 12),
+                  // Category Filter
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children:
+                          [
+                            'All',
+                            'Snacks',
+                            'Beverages',
+                            'South Indian',
+                            'North Indian',
+                            'Chinese',
+                            'Desserts',
+                          ].map((category) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(category),
+                                selected: _selectedCategory == category,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    _selectedCategory = selected
+                                        ? category
+                                        : 'All';
+                                  });
+                                },
+                                backgroundColor: Colors.white,
+                                selectedColor: AppTheme.primary,
+                              ),
+                            );
+                          }).toList(),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Products List
-          Expanded(
-            child: vendorProvider.isLoadingProducts
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppTheme.primary),
-                  )
-                : filteredProducts.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
+            // Products List
+            Expanded(
+              child: vendorProvider.isLoadingProducts
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primary),
+                    )
+                  : filteredProducts.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.48,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.inventory_2_outlined,
+                                      size: 64,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      vendorProvider.products.isNotEmpty
+                                          ? 'No matching products'
+                                          : 'No products found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      vendorProvider.products.isNotEmpty
+                                          ? 'Try clearing search or selecting All category'
+                                          : 'Pull to refresh or tap + to add your first product',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    if (vendorProvider.productsError != null) ...[
+                                      const SizedBox(height: 12),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                        ),
+                                        child: Text(
+                                          vendorProvider.productsError!,
+                                          style: const TextStyle(
+                                            color: AppTheme.error,
+                                            fontSize: 12,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: filteredProducts.length,
+                          itemBuilder: (context, index) {
+                            return ProductCard(
+                              product: filteredProducts[index],
+                              onEdit: () => _showEditProductDialog(
+                                filteredProducts[index],
+                              ),
+                              onDelete: () => _showDeleteConfirmDialog(
+                                filteredProducts[index],
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          vendorProvider.products.isNotEmpty
-                              ? 'No matching products'
-                              : 'No products found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          vendorProvider.products.isNotEmpty
-                              ? 'Try clearing search or selecting All category'
-                              : 'Tap the + button to add your first product',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filteredProducts.length,
-                    itemBuilder: (context, index) {
-                      return ProductCard(
-                        product: filteredProducts[index],
-                        onEdit: () =>
-                            _showEditProductDialog(filteredProducts[index]),
-                        onDelete: () =>
-                            _showDeleteConfirmDialog(filteredProducts[index]),
-                      );
-                    },
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -910,10 +997,8 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         SecureLogger.info(
           'Starting image upload. Product images: ${_productImageFiles.length}, Uploaded URLs: ${_uploadedImageUrls.length}',
         );
-        SecureLogger.info('Base URL: ${ApiEndpoints.baseUrl}');
-        SecureLogger.info('Endpoint: ${ApiEndpoints.uploadProductImages}');
         SecureLogger.info(
-          'Existing images before upload merge: $existingImageUrls',
+          'Existing image count before upload merge: ${existingImageUrls.length}',
           tag: 'PRODUCTS',
         );
 
@@ -941,9 +1026,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                   !newlyUploadedImageUrls.contains(newImageUrl)) {
                 newlyUploadedImageUrls.add(newImageUrl);
               }
-              SecureLogger.info(
-                'Successfully uploaded image: ${result.imageUrl}',
-              );
+              SecureLogger.info('Successfully uploaded product image');
             } else {
               SecureLogger.warning('Failed to upload image: ${result.error}');
             }
@@ -995,11 +1078,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         }
 
         SecureLogger.info(
-          'Final images array for PUT /api/vendor/products/${widget.product.id}: $finalImageUrls',
-          tag: 'PRODUCTS',
-        );
-        SecureLogger.info(
-          'Final images count for update: ${finalImageUrls.length}',
+          'Final image count for update: ${finalImageUrls.length}',
           tag: 'PRODUCTS',
         );
 
@@ -1043,7 +1122,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         setState(() {
           _imageCacheBustKey = DateTime.now().millisecondsSinceEpoch.toString();
         });
-        navigator.pop();
+        navigator.pop(true);
         if (mounted) {
           scaffoldMessenger.showSnackBar(
             SnackBar(

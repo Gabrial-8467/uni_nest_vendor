@@ -113,7 +113,7 @@ class BusinessTypes {
   static const String canteen = 'canteen';
   static const String restaurant = 'restaurant';
   static const String cafe = 'cafe';
-  static const String foodTruck = 'food_truck';
+  static const String foodTruck = 'food truck';
   static const String other = 'other';
 }
 

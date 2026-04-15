@@ -167,11 +167,11 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
       case 0:
         return const _OverviewTabHost();
       case 1:
-        return const VendorOrdersTab();
+        return const VendorOrdersTab(showAppBar: false);
       case 2:
-        return const ProductsScreen();
+        return const ProductsScreen(showAppBar: false);
       case 3:
-        return const AnalyticsScreen();
+        return const AnalyticsScreen(showPageHeader: false);
       case 4:
         return const VendorProfileTab();
       default:

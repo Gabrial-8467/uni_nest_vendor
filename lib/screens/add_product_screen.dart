@@ -75,23 +75,23 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      debugPrint('📸 Starting image pick from source: $source');
+      SecureLogger.info('Starting image pick from source: $source');
 
       // Request permissions first
       bool hasPermission = false;
 
       if (source == ImageSource.camera) {
-        debugPrint('📷 Requesting camera permission...');
+        SecureLogger.info('Requesting camera permission');
         hasPermission = await PermissionService.requestPermission(
           Permission.camera,
         );
       } else {
-        debugPrint('📁 Requesting storage permission...');
+        SecureLogger.info('Requesting storage permission');
         // Use requestStoragePermission() which handles Android 13+ properly
         hasPermission = await PermissionService.requestStoragePermission();
       }
 
-      debugPrint('🔐 Permission granted: $hasPermission');
+      SecureLogger.info('Image permission granted: $hasPermission');
 
       if (!hasPermission) {
         if (mounted) {
@@ -100,7 +100,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         return;
       }
 
-      debugPrint('🖼️ Opening image picker...');
+      SecureLogger.info('Opening image picker');
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 90,
@@ -108,15 +108,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         maxHeight: 1200,
       );
 
-      debugPrint('📷 Image picked: ${image != null ? 'YES' : 'NO'}');
+      SecureLogger.info('Image picked: ${image != null ? 'yes' : 'no'}');
 
       if (image != null && mounted) {
         final imageFile = File(image.path);
-        debugPrint('📁 Image file path: ${imageFile.path}');
-
         // Validate and optimize the image
         if (!ImageUploadService.isValidImageFile(imageFile)) {
-          debugPrint('❌ Invalid image file format');
+          SecureLogger.warning('Invalid image file format');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -134,8 +132,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
           _productImageFiles.add(imageFile);
         });
 
-        debugPrint(
-          '✅ Image added successfully. Total images: ${_productImageFiles.length}',
+        SecureLogger.info(
+          'Image added successfully. Total images: ${_productImageFiles.length}',
         );
 
         if (mounted) {
@@ -150,7 +148,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error picking image: $e');
+      SecureLogger.error('Error picking image', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -286,8 +284,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
             : null,
       };
 
-      SecureLogger.info('Creating product with data: $productData');
-      SecureLogger.info('Image files count: ${_productImageFiles.length}');
+      SecureLogger.info(
+        'Creating product with ${_productImageFiles.length} image(s)',
+        tag: 'PRODUCTS',
+      );
 
       // Create product with images
       final success = await vendorProvider.createProduct(
@@ -303,7 +303,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

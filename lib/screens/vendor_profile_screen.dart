@@ -622,18 +622,21 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
     final phoneController = TextEditingController(text: profile.phone);
 
     // Business type options
-    final businessTypes = [
-      'Restaurant',
-      'Cafe',
-      'Bakery',
-      'Fast Food',
-      'Food Truck',
-      'Cloud Kitchen',
-      'Catering',
-      'Other',
-    ];
+    const businessTypes = <String, String>{
+      'Canteen': 'canteen',
+      'Cafe': 'cafe',
+      'Restaurant': 'restaurant',
+      'Food Truck': 'food truck',
+      'Other': 'other',
+    };
 
-    String selectedBusinessType = profile.businessType ?? 'Restaurant';
+    final initialBusinessType =
+        profile.businessType?.trim().toLowerCase().isNotEmpty == true
+        ? profile.businessType!.trim().toLowerCase()
+        : 'restaurant';
+    String selectedBusinessType = businessTypes.containsValue(initialBusinessType)
+        ? initialBusinessType
+        : 'other';
     bool isLoading = false;
 
     showDialog(
@@ -746,10 +749,10 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
                       borderSide: BorderSide(color: AppTheme.primary),
                     ),
                   ),
-                  items: businessTypes.map((String type) {
+                  items: businessTypes.entries.map((entry) {
                     return DropdownMenuItem<String>(
-                      value: type,
-                      child: Text(type),
+                      value: entry.value,
+                      child: Text(entry.key),
                     );
                   }).toList(),
                   onChanged: (String? value) {

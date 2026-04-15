@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vendor_notification.dart';
 import '../services/vendor_notification_service.dart';
+import '../utils/secure_logger.dart';
 
 /// Vendor Notification state management
 @immutable
@@ -55,8 +56,11 @@ class VendorNotificationController
   VendorNotificationController() : super(const VendorNotificationState());
 
   Timer? _pollingTimer;
-  static const Duration _pollingInterval = Duration(seconds: 10);
+  static const Duration _pollingInterval = Duration(seconds: 45);
+  static const Duration _minimumRefreshGap = Duration(seconds: 20);
   bool _isDisposed = false;
+  bool _isFetching = false;
+  DateTime? _lastLoadedAt;
 
   @override
   void dispose() {
@@ -66,8 +70,17 @@ class VendorNotificationController
   }
 
   /// Load notifications from backend API
-  Future<void> loadNotifications({bool silent = false}) async {
-    if (state.isLoading && !silent) return; // Prevent duplicate loading
+  Future<void> loadNotifications({bool silent = false, bool force = false}) async {
+    if (_isFetching || (state.isLoading && !silent)) return;
+
+    final now = DateTime.now();
+    if (!force &&
+        _lastLoadedAt != null &&
+        now.difference(_lastLoadedAt!) < _minimumRefreshGap) {
+      return;
+    }
+
+    _isFetching = true;
 
     if (!silent) {
       state = state.copyWith(isLoading: true, clearError: true);
@@ -81,11 +94,21 @@ class VendorNotificationController
         isLoading: false,
         clearError: true,
       );
+      _lastLoadedAt = DateTime.now();
 
-      debugPrint('Loaded ${notifications.length} notifications');
+      SecureLogger.info(
+        'Loaded ${notifications.length} notifications',
+        tag: 'NOTIFICATIONS',
+      );
     } catch (e) {
-      debugPrint('Error loading notifications: $e');
+      SecureLogger.error(
+        'Error loading notifications',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    } finally {
+      _isFetching = false;
     }
   }
 
@@ -106,10 +129,14 @@ class VendorNotificationController
         clearError: true,
       );
 
-      debugPrint('Marked all notifications as read');
+      SecureLogger.info('Marked all notifications as read', tag: 'NOTIFICATIONS');
       return true;
     } catch (e) {
-      debugPrint('Error marking all as read: $e');
+      SecureLogger.error(
+        'Error marking all as read',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       state = state.copyWith(errorMessage: e.toString());
       return false;
     }
@@ -133,10 +160,32 @@ class VendorNotificationController
         clearError: true,
       );
 
-      debugPrint('Marked notification $notificationId as read');
+      SecureLogger.info('Marked notification as read', tag: 'NOTIFICATIONS');
       return true;
     } catch (e) {
-      debugPrint('Error marking notification as read: $e');
+      SecureLogger.error(
+        'Error marking notification as read',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  /// Clear all notifications using the backend bulk endpoint
+  Future<bool> clearAll() async {
+    try {
+      await VendorNotificationService.clearAll();
+      state = state.copyWith(notifications: const [], clearError: true);
+      SecureLogger.info('Cleared all notifications', tag: 'NOTIFICATIONS');
+      return true;
+    } catch (e) {
+      SecureLogger.error(
+        'Error clearing notifications',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       state = state.copyWith(errorMessage: e.toString());
       return false;
     }
@@ -157,10 +206,14 @@ class VendorNotificationController
         clearError: true,
       );
 
-      debugPrint('Deleted notification $notificationId');
+      SecureLogger.info('Deleted notification', tag: 'NOTIFICATIONS');
       return true;
     } catch (e) {
-      debugPrint('Error deleting notification: $e');
+      SecureLogger.error(
+        'Error deleting notification',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       state = state.copyWith(errorMessage: e.toString());
       return false;
     }
@@ -169,17 +222,16 @@ class VendorNotificationController
   /// Start automatic polling for new notifications
   void startPolling() {
     if (state.isPolling) {
-      debugPrint('Polling already active');
+      SecureLogger.info('Notification polling already active');
       return;
     }
 
-    debugPrint('Starting notification polling');
+    SecureLogger.info('Starting notification polling');
     state = state.copyWith(isPolling: true);
 
     _pollingTimer = Timer.periodic(_pollingInterval, (timer) async {
       if (_isDisposed) return;
 
-      debugPrint('Polling for notifications...');
       await loadNotifications(silent: true);
     });
   }
@@ -191,7 +243,7 @@ class VendorNotificationController
 
     if (!state.isPolling) return;
 
-    debugPrint('Stopped notification polling');
+    SecureLogger.info('Stopped notification polling');
     state = state.copyWith(isPolling: false);
   }
 
@@ -207,7 +259,7 @@ class VendorNotificationController
       notifications: updatedNotifications,
       clearError: true,
     );
-    debugPrint('Added new notification: ${notification.title}');
+    SecureLogger.info('Added new notification', tag: 'NOTIFICATIONS');
   }
 }
 

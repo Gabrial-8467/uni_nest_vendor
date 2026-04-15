@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/vendor_config.dart';
 import '../core/api_client.dart';
 import '../models/auth_models.dart';
 import '../models/ledger_models.dart';
@@ -23,28 +24,7 @@ class VendorApiService {
       data: {'email': email, 'password': password},
       usePublicClient: true,
     );
-
-    final data = response.data!;
-    final token = data['token'] as String? ?? data['accessToken'] as String?;
-
-    if (token == null || token.isEmpty) {
-      throw const ApiException(
-        'No access token received from server',
-        statusCode: 400,
-      );
-    }
-
-    // Parse user data
-    final userData = data['user'] ?? data['vendor'] ?? data['data'];
-    final user = VendorProfile.fromJson(
-      userData is Map<String, dynamic> ? userData : <String, dynamic>{},
-    );
-
-    return AuthSession(
-      accessToken: token,
-      refreshToken: data['refreshToken'] as String?,
-      profile: user,
-    );
+    return AuthSession.fromLoginResponse(response.data!);
   }
 
   /// Register new vendor
@@ -68,46 +48,21 @@ class VendorApiService {
       },
       usePublicClient: true,
     );
-
-    final data = response.data!;
-    final token = data['token'] as String? ?? data['accessToken'] as String?;
-
-    if (token == null || token.isEmpty) {
-      throw const ApiException(
-        'No access token received from server',
-        statusCode: 400,
-      );
-    }
-
-    // Parse user data
-    final userData = data['user'] ?? data['vendor'] ?? data['data'];
-    final user = VendorProfile.fromJson(
-      userData is Map<String, dynamic> ? userData : <String, dynamic>{},
-    );
-
-    return AuthSession(
-      accessToken: token,
-      refreshToken: data['refreshToken'] as String?,
-      profile: user,
-    );
+    return AuthSession.fromLoginResponse(response.data!);
   }
 
   /// Forgot password
   Future<void> forgotPassword({required String email}) async {
-    await _apiClient.post<void>(
-      '/auth/forgot-password',
-      data: {'email': email},
-      usePublicClient: true,
+    throw const ApiException(
+      'Forgot password is not available in the current vendor API.',
+      statusCode: 404,
     );
   }
 
   /// Logout
   Future<void> logout() async {
-    try {
-      await _apiClient.post<void>('/auth/logout');
-    } catch (e) {
-      // Ignore logout API errors - token will be cleared locally
-    }
+    // The current vendor backend does not expose a logout endpoint.
+    // Session cleanup is handled locally by the auth layer.
   }
 
   // ==================== PROFILE ====================
@@ -128,9 +83,24 @@ class VendorApiService {
 
   /// Update vendor profile
   Future<VendorProfile> updateProfile(Map<String, dynamic> profileData) async {
+    final payload = Map<String, dynamic>.from(profileData);
+    final contactInfo = payload['contactInfo'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(payload['contactInfo'] as Map)
+        : <String, dynamic>{};
+
+    if (payload['phone'] != null && contactInfo['phone'] == null) {
+      contactInfo['phone'] = payload['phone'];
+    }
+    if (payload['email'] != null && contactInfo['email'] == null) {
+      contactInfo['email'] = payload['email'];
+    }
+    if (contactInfo.isNotEmpty) {
+      payload['contactInfo'] = contactInfo;
+    }
+
     final response = await _apiClient.put<VendorProfile>(
       '/profile',
-      data: profileData,
+      data: payload,
       fromJson: (data) {
         final userData = data['data'] ?? data;
         return VendorProfile.fromJson(
@@ -186,6 +156,7 @@ class VendorApiService {
     required String status,
     String? note,
     String? estimatedDeliveryTime,
+    String? otp,
   }) async {
     final response = await _apiClient.put<VendorOrder>(
       '/orders/$orderId/status',
@@ -195,6 +166,7 @@ class VendorApiService {
         if (estimatedDeliveryTime != null &&
             estimatedDeliveryTime.trim().isNotEmpty)
           'estimatedDeliveryTime': estimatedDeliveryTime.trim(),
+        if (otp != null && otp.trim().isNotEmpty) 'otp': otp.trim(),
       },
       fromJson: (data) {
         final payload = data['data'] ?? data;
@@ -214,20 +186,11 @@ class VendorApiService {
     required String orderId,
     required String reason,
   }) async {
-    final response = await _apiClient.post<VendorOrder>(
-      '/orders/$orderId/reject',
-      data: {'reason': reason},
-      fromJson: (data) {
-        final payload = data['data'] ?? data;
-        final orderJson = payload is Map<String, dynamic>
-            ? payload['order'] is Map<String, dynamic>
-                  ? Map<String, dynamic>.from(payload['order'] as Map)
-                  : payload
-            : <String, dynamic>{};
-        return VendorOrder.fromJson(orderJson);
-      },
+    return updateOrderStatus(
+      orderId: orderId,
+      status: 'cancelled',
+      note: reason,
     );
-    return response.data!;
   }
 
   /// Verify delivery OTP
@@ -235,20 +198,12 @@ class VendorApiService {
     required String orderId,
     required String otp,
   }) async {
-    final response = await _apiClient.post<VendorOrder>(
-      '/orders/$orderId/delivery-otp/verify',
-      data: {'otp': otp},
-      fromJson: (data) {
-        final payload = data['data'] ?? data;
-        final orderJson = payload is Map<String, dynamic>
-            ? payload['order'] is Map<String, dynamic>
-                  ? Map<String, dynamic>.from(payload['order'] as Map)
-                  : payload
-            : <String, dynamic>{};
-        return VendorOrder.fromJson(orderJson);
-      },
+    return updateOrderStatus(
+      orderId: orderId,
+      status: 'delivered',
+      note: 'Delivery OTP verified by vendor',
+      otp: otp,
     );
-    return response.data!;
   }
 
   // ==================== LEDGER ====================
@@ -355,9 +310,8 @@ class VendorApiService {
 
   /// Check app version (public endpoint)
   Future<Map<String, dynamic>> checkVersion() async {
-    final response = await _apiClient.get<Map<String, dynamic>>(
-      '/version',
-      usePublicClient: true,
+    final response = await _apiClient.publicDio.get<Map<String, dynamic>>(
+      '${VendorConfig.apiRootUrl}/version/check',
     );
     return response.data!;
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../config/vendor_config.dart';
 import '../providers/auth_provider.dart';
 import 'api_client.dart';
 
@@ -69,12 +70,10 @@ class AppInitializer {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      // Make API call to get version info using public client
-      final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.get<Map<String, dynamic>>(
-        '/api/version',
-        usePublicClient: true,
-      );
+      final response = await ref
+          .read(apiClientProvider)
+          .publicDio
+          .get<Map<String, dynamic>>('${VendorConfig.apiRootUrl}/version/check');
 
       if (response.data != null) {
         debugPrint('App version check completed successfully');

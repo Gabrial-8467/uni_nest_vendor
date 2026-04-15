@@ -46,8 +46,10 @@ class OrderController extends StateNotifier<OrderState> {
   final Ref _ref;
   Timer? _pollingTimer;
   bool _isFetching = false;
+  static const Duration _pollingInterval = Duration(seconds: 45);
+  static const Duration _minimumRefreshGap = Duration(seconds: 15);
 
-  Future<void> loadOrders({bool silent = false}) async {
+  Future<void> loadOrders({bool silent = false, bool force = false}) async {
     if (!_ref.read(authProvider).isAuthenticated) {
       state = const OrderState();
       return;
@@ -56,6 +58,14 @@ class OrderController extends StateNotifier<OrderState> {
     if (_isFetching) {
       return;
     }
+
+    if (!force && state.lastUpdatedAt != null) {
+      final elapsed = DateTime.now().difference(state.lastUpdatedAt!);
+      if (elapsed < _minimumRefreshGap) {
+        return;
+      }
+    }
+
     _isFetching = true;
 
     if (!silent) {
@@ -78,7 +88,7 @@ class OrderController extends StateNotifier<OrderState> {
 
   void startPolling() {
     _pollingTimer ??= Timer.periodic(
-      const Duration(seconds: 20),
+      _pollingInterval,
       (_) => loadOrders(silent: true),
     );
   }
@@ -107,6 +117,32 @@ class OrderController extends StateNotifier<OrderState> {
           .read(vendorApiClientProvider)
           .updateOrderStatus(orderId: orderId, status: status, note: note),
     );
+  }
+
+  Future<VendorOrder?> fetchOrderById(String orderId) async {
+    if (!_ref.read(authProvider).isAuthenticated) {
+      return null;
+    }
+
+    try {
+      final order = await _ref.read(vendorApiClientProvider).getOrderById(
+        orderId,
+      );
+      final updatedOrders = [
+        for (final existing in state.orders)
+          if (existing.id == order.id) order else existing,
+        if (!state.orders.any((existing) => existing.id == order.id)) order,
+      ];
+      state = state.copyWith(
+        orders: updatedOrders,
+        lastUpdatedAt: DateTime.now(),
+        clearError: true,
+      );
+      return order;
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString());
+      return null;
+    }
   }
 
   Future<bool> rejectOrder({

@@ -28,7 +28,9 @@ import '../providers/order_provider.dart';
 // =============================================================================
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
-  const AnalyticsScreen({super.key});
+  const AnalyticsScreen({super.key, this.showPageHeader = true});
+
+  final bool showPageHeader;
 
   @override
   ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -169,14 +171,20 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         backgroundColor: AppTheme.surface,
         elevation: 0,
         foregroundColor: AppTheme.textPrimary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Analytics',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-        ),
+        automaticallyImplyLeading: widget.showPageHeader,
+        toolbarHeight: widget.showPageHeader ? kToolbarHeight : 0,
+        leading: widget.showPageHeader
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
+        title: widget.showPageHeader
+            ? const Text(
+                'Analytics',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+              )
+            : null,
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,

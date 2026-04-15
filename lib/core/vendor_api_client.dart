@@ -92,11 +92,8 @@ class VendorApiClient {
   }
 
   Future<void> forgotPassword({required String email}) async {
-    await _request(
-      method: 'POST',
-      path: '/auth/forgot-password',
-      requiresAuth: false,
-      body: {'email': email},
+    throw VendorApiException(
+      'Forgot password is not available in the current vendor API.',
     );
   }
 
@@ -128,16 +125,29 @@ class VendorApiClient {
 
   Future<VendorProfile> getProfile() async {
     final response = await _request(method: 'GET', path: '/profile');
-    return VendorProfile.fromJson(
-      Map<String, dynamic>.from(response['data'] ?? const {}),
-    );
+    return VendorProfile.fromJson(_asMap(response['data']));
   }
 
   Future<VendorProfile> updateProfile(Map<String, dynamic> body) async {
+    final payload = Map<String, dynamic>.from(body);
+    final contactInfo = payload['contactInfo'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(payload['contactInfo'] as Map)
+        : <String, dynamic>{};
+
+    if (payload['phone'] != null && contactInfo['phone'] == null) {
+      contactInfo['phone'] = payload['phone'];
+    }
+    if (payload['email'] != null && contactInfo['email'] == null) {
+      contactInfo['email'] = payload['email'];
+    }
+    if (contactInfo.isNotEmpty) {
+      payload['contactInfo'] = contactInfo;
+    }
+
     final response = await _request(
       method: 'PUT',
       path: '/profile',
-      body: body,
+      body: payload,
     );
     final data = response['data'];
     if (data is Map<String, dynamic> && data.isNotEmpty) {
@@ -170,11 +180,23 @@ class VendorApiClient {
         .toList();
   }
 
+  Future<VendorOrder> getOrderById(String orderId) async {
+    final response = await _request(method: 'GET', path: '/orders/$orderId');
+    final payload = response['data'];
+    final orderJson = payload is Map<String, dynamic>
+        ? payload['order'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(payload['order'] as Map)
+              : payload
+        : <String, dynamic>{};
+    return VendorOrder.fromJson(orderJson);
+  }
+
   Future<VendorOrder> updateOrderStatus({
     required String orderId,
     required String status,
     String? note,
     String? estimatedDeliveryTime,
+    String? otp,
   }) async {
     final response = await _request(
       method: 'PUT',
@@ -185,6 +207,7 @@ class VendorApiClient {
         if (estimatedDeliveryTime != null &&
             estimatedDeliveryTime.trim().isNotEmpty)
           'estimatedDeliveryTime': estimatedDeliveryTime.trim(),
+        if (otp != null && otp.trim().isNotEmpty) 'otp': otp.trim(),
       },
     );
 
@@ -201,36 +224,23 @@ class VendorApiClient {
     required String orderId,
     required String reason,
   }) async {
-    final response = await _request(
-      method: 'POST',
-      path: '/orders/$orderId/reject',
-      body: {'reason': reason},
+    return updateOrderStatus(
+      orderId: orderId,
+      status: 'cancelled',
+      note: reason,
     );
-    final payload = response['data'];
-    final orderJson = payload is Map<String, dynamic>
-        ? payload['order'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(payload['order'] as Map)
-              : payload
-        : <String, dynamic>{};
-    return VendorOrder.fromJson(orderJson);
   }
 
   Future<VendorOrder> verifyDeliveryOtp({
     required String orderId,
     required String otp,
   }) async {
-    final response = await _request(
-      method: 'POST',
-      path: '/orders/$orderId/delivery-otp/verify',
-      body: {'otp': otp},
+    return updateOrderStatus(
+      orderId: orderId,
+      status: 'delivered',
+      note: 'Delivery OTP verified by vendor',
+      otp: otp,
     );
-    final payload = response['data'];
-    final orderJson = payload is Map<String, dynamic>
-        ? payload['order'] is Map<String, dynamic>
-              ? Map<String, dynamic>.from(payload['order'] as Map)
-              : payload
-        : <String, dynamic>{};
-    return VendorOrder.fromJson(orderJson);
   }
 
   Future<VendorLedgerSummary> getLedger() async {
@@ -293,6 +303,18 @@ class VendorApiClient {
 
   Future<void> markAllNotificationsRead() async {
     await _request(method: 'PUT', path: '/notifications/mark-all-read');
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    try {
+      await _request(method: 'PUT', path: '/notifications/$notificationId/read');
+    } on VendorApiException catch (error) {
+      if (error.statusCode == 404 || error.statusCode == 405) {
+        await markAllNotificationsRead();
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> clearAllNotifications() async {
@@ -414,11 +436,25 @@ class VendorApiClient {
       return <String, dynamic>{};
     }
 
-    final decoded = jsonDecode(body);
-    if (decoded is Map<String, dynamic>) {
-      return decoded;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return {'data': decoded};
+    } catch (_) {
+      return {'message': body};
     }
-    return {'data': decoded};
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return <String, dynamic>{};
   }
 
   void _invalidateMutableCaches() {

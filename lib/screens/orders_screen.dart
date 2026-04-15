@@ -9,7 +9,9 @@ import '../widgets/order_list_card.dart';
 import 'order_details_screen.dart';
 
 class VendorOrdersTab extends ConsumerStatefulWidget {
-  const VendorOrdersTab({super.key});
+  const VendorOrdersTab({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<VendorOrdersTab> createState() => _VendorOrdersTabState();
@@ -28,6 +30,10 @@ class _VendorOrdersTabState extends ConsumerState<VendorOrdersTab>
     _controller.addListener(() {
       if (!mounted) return;
       setState(() {});
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(orderProvider.notifier).loadOrders();
     });
   }
 
@@ -61,12 +67,44 @@ class _VendorOrdersTabState extends ConsumerState<VendorOrdersTab>
     return Scaffold(
       key: _key,
       backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface,
-        elevation: 0,
-        foregroundColor: AppTheme.textPrimary,
-        toolbarHeight: 8,
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              backgroundColor: AppTheme.surface,
+              elevation: 0,
+              foregroundColor: AppTheme.textPrimary,
+              titleSpacing: 16,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Manage Orders',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    orderState.isLoading
+                        ? 'Loading order queues...'
+                        : '${orderState.orders.length} order${orderState.orders.length == 1 ? '' : 's'} total',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Refresh orders',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: orderState.isLoading
+                      ? null
+                      : () => ref
+                            .read(orderProvider.notifier)
+                            .loadOrders(force: true),
+                ),
+              ],
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -217,18 +255,28 @@ class _OrderListView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final orderState = ref.watch(orderProvider);
+
     return RefreshIndicator(
-      onRefresh: () => ref.read(orderProvider.notifier).loadOrders(),
+      onRefresh: () =>
+          ref.read(orderProvider.notifier).loadOrders(force: true),
       child: orders.isEmpty
           ? ListView(
-              children: const [
-                SizedBox(height: 120),
-                EmptyState(
-                  icon: Icons.inbox_outlined,
-                  title: 'No orders here',
-                  message:
-                      'Orders for this stage will appear once they are moved into this queue.',
-                ),
+              children: [
+                const SizedBox(height: 120),
+                if (orderState.isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  EmptyState(
+                    icon: orderState.errorMessage == null
+                        ? Icons.inbox_outlined
+                        : Icons.error_outline,
+                    title: orderState.errorMessage == null
+                        ? 'No orders here'
+                        : 'Could not load orders',
+                    message: orderState.errorMessage ??
+                        'Orders for this stage will appear once they are moved into this queue.',
+                  ),
               ],
             )
           : ListView.builder(

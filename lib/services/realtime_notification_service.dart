@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../config/vendor_config.dart';
 import '../models/vendor_notification.dart';
 import '../providers/vendor_notification_provider.dart';
+import '../utils/secure_logger.dart';
 
 /// Real-time notification service using WebSocket
 class RealtimeNotificationService {
@@ -25,10 +26,16 @@ class RealtimeNotificationService {
   /// Initialize WebSocket connection
   static Future<void> initialize() async {
     try {
-      final wsUrl =
-          'ws://your-backend-url.com/notifications'; // Replace with actual WebSocket URL
+      final wsUrl = VendorConfig.realtimeNotificationsUrl;
+      if (wsUrl == null) {
+        SecureLogger.info(
+          'Realtime notifications disabled: no secure websocket URL configured',
+          tag: 'REALTIME',
+        );
+        return;
+      }
 
-      debugPrint('Connecting to WebSocket: $wsUrl');
+      SecureLogger.info('Connecting to notification WebSocket', tag: 'REALTIME');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       _notificationController =
@@ -39,20 +46,20 @@ class RealtimeNotificationService {
       _channel!.stream.listen(
         _handleWebSocketMessage,
         onError: (error) {
-          debugPrint('WebSocket error: $error');
+          SecureLogger.error('WebSocket error', error: error, tag: 'REALTIME');
           _scheduleReconnect();
         },
         onDone: () {
-          debugPrint('WebSocket connection closed');
+          SecureLogger.info('WebSocket connection closed', tag: 'REALTIME');
           _isConnected = false;
           _scheduleReconnect();
         },
       );
 
       _isConnected = true;
-      debugPrint('WebSocket connected successfully');
+      SecureLogger.info('WebSocket connected successfully', tag: 'REALTIME');
     } catch (e) {
-      debugPrint('Failed to connect WebSocket: $e');
+      SecureLogger.error('Failed to connect WebSocket', error: e, tag: 'REALTIME');
       _scheduleReconnect();
     }
   }
@@ -60,11 +67,15 @@ class RealtimeNotificationService {
   /// Handle incoming WebSocket messages
   static void _handleWebSocketMessage(dynamic message) {
     try {
-      final data = jsonDecode(message as String);
+      final decoded = jsonDecode(message as String);
+      if (decoded is! Map) return;
+      final data = Map<String, dynamic>.from(decoded);
 
       if (data['type'] == 'notification') {
+        final rawNotification = data['data'];
+        if (rawNotification is! Map) return;
         final notification = VendorNotification.fromJson(
-          data['data'] as Map<String, dynamic>,
+          Map<String, dynamic>.from(rawNotification),
         );
         _notificationController?.add(notification);
 
@@ -75,26 +86,32 @@ class RealtimeNotificationService {
               .addNotification(notification);
         }
 
-        debugPrint('Received real-time notification: ${notification.title}');
+        SecureLogger.info('Received real-time notification', tag: 'REALTIME');
       } else if (data['type'] == 'notification_read') {
         // Handle notification read event
         final notificationId = data['notificationId'] as String?;
-        debugPrint('Marking notification as read: $notificationId');
+        if (notificationId == null || notificationId.isEmpty) return;
+        SecureLogger.info('Realtime notification marked read', tag: 'REALTIME');
         // Update notification as read in provider
         _ref
             ?.read(vendorNotificationProvider.notifier)
-            .markAsRead(notificationId!);
+            .markAsRead(notificationId);
       } else if (data['type'] == 'notification_deleted') {
         // Handle notification deleted event
         final notificationId = data['notificationId'] as String?;
-        debugPrint('Deleting notification: $notificationId');
+        if (notificationId == null || notificationId.isEmpty) return;
+        SecureLogger.info('Realtime notification deleted', tag: 'REALTIME');
         // Remove notification from provider
         _ref
             ?.read(vendorNotificationProvider.notifier)
-            .deleteNotification(notificationId!);
+            .deleteNotification(notificationId);
       }
     } catch (e) {
-      debugPrint('Error parsing WebSocket message: $e');
+      SecureLogger.error(
+        'Error parsing WebSocket message',
+        error: e,
+        tag: 'REALTIME',
+      );
     }
   }
 
@@ -103,7 +120,7 @@ class RealtimeNotificationService {
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(_reconnectInterval, () {
       if (!_isConnected) {
-        debugPrint('Attempting to reconnect WebSocket...');
+        SecureLogger.info('Attempting to reconnect WebSocket', tag: 'REALTIME');
         initialize();
       }
     });
@@ -118,9 +135,9 @@ class RealtimeNotificationService {
     if (_channel != null && _isConnected) {
       try {
         _channel!.sink.add(jsonEncode(message));
-        debugPrint('Sent WebSocket message: $message');
+        SecureLogger.info('Sent WebSocket message', tag: 'REALTIME');
       } catch (e) {
-        debugPrint('Error sending WebSocket message: $e');
+        SecureLogger.error('Error sending WebSocket message', error: e, tag: 'REALTIME');
       }
     }
   }
@@ -131,7 +148,7 @@ class RealtimeNotificationService {
     _channel?.sink.close();
     _notificationController?.close();
     _isConnected = false;
-    debugPrint('WebSocket disconnected');
+    SecureLogger.info('WebSocket disconnected', tag: 'REALTIME');
   }
 
   /// Check connection status
@@ -141,23 +158,23 @@ class RealtimeNotificationService {
 /// Fallback polling service for when WebSocket is unavailable
 class FallbackPollingService {
   static Timer? _pollingTimer;
-  static const Duration _pollingInterval = Duration(seconds: 15);
+  static const Duration _pollingInterval = Duration(seconds: 60);
   static bool _isPolling = false;
 
   /// Start fallback polling
   static void start() {
     if (_isPolling) return;
 
-    debugPrint('Starting fallback polling');
+    SecureLogger.info('Starting fallback polling', tag: 'REALTIME');
     _isPolling = true;
 
     _pollingTimer = Timer.periodic(_pollingInterval, (timer) async {
       try {
         // Simulate receiving new notifications
         // In real implementation, this would call the API
-        debugPrint('Fallback polling check...');
+        SecureLogger.info('Fallback polling check', tag: 'REALTIME');
       } catch (e) {
-        debugPrint('Error in fallback polling: $e');
+        SecureLogger.error('Error in fallback polling', error: e, tag: 'REALTIME');
       }
     });
   }
@@ -167,7 +184,7 @@ class FallbackPollingService {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _isPolling = false;
-    debugPrint('Stopped fallback polling');
+    SecureLogger.info('Stopped fallback polling', tag: 'REALTIME');
   }
 
   /// Check polling status
@@ -190,7 +207,7 @@ class EnhancedNotificationService {
 
       if (RealtimeNotificationService.isConnected) {
         _realtimeAvailable = true;
-        debugPrint('Using real-time notifications');
+        SecureLogger.info('Using real-time notifications', tag: 'REALTIME');
         return;
       }
     }
@@ -198,7 +215,7 @@ class EnhancedNotificationService {
     // Fallback to polling if WebSocket fails
     _realtimeAvailable = false;
     FallbackPollingService.start();
-    debugPrint('Using fallback polling');
+    SecureLogger.info('Using fallback polling', tag: 'REALTIME');
   }
 
   /// Get unified notification stream

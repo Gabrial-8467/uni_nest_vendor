@@ -85,7 +85,7 @@ class VendorNotificationScreen extends ConsumerWidget {
                 case 'refresh':
                   ref
                       .read(vendorNotificationProvider.notifier)
-                      .loadNotifications();
+                      .loadNotifications(force: true);
                   break;
                 case 'clear_all':
                   _showClearAllDialog(context, ref);
@@ -203,7 +203,7 @@ class VendorNotificationScreen extends ConsumerWidget {
               onPressed: () {
                 ref
                     .read(vendorNotificationProvider.notifier)
-                    .loadNotifications();
+                    .loadNotifications(force: true);
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
@@ -264,7 +264,9 @@ class VendorNotificationScreen extends ConsumerWidget {
   ) {
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(vendorNotificationProvider.notifier).loadNotifications();
+        await ref
+            .read(vendorNotificationProvider.notifier)
+            .loadNotifications(force: true);
       },
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
@@ -646,22 +648,23 @@ class VendorNotificationScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              ref.read(vendorNotificationProvider.notifier).clearError();
-              // Clear all by deleting each one
-              final notifications = ref
-                  .read(vendorNotificationProvider)
-                  .notifications;
-              for (final notification in notifications) {
-                ref
-                    .read(vendorNotificationProvider.notifier)
-                    .deleteNotification(notification.id);
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('All notifications cleared'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              ref.read(vendorNotificationProvider.notifier).clearAll().then((
+                success,
+              ) {
+                if (!context.mounted) {
+                  return;
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? 'All notifications cleared'
+                          : 'Failed to clear notifications',
+                    ),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                  ),
+                );
+              });
             },
             child: const Text('Clear All', style: TextStyle(color: Colors.red)),
           ),

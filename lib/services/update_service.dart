@@ -159,8 +159,7 @@ class UpdateService {
   }
 
   Future<http.Response> _callVersionCheckApi() async {
-    final baseUrl = VendorConfig.apiBaseUrl;
-    final url = '$baseUrl/version/check';
+    final url = '${VendorConfig.apiRootUrl}/version/check';
 
     return await http
         .get(

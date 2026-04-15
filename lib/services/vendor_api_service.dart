@@ -196,6 +196,14 @@ class ApiClient {
               body: body == null ? null : jsonEncode(body),
             )
             .timeout(timeout);
+      case ApiMethods.patch:
+        return _httpClient
+            .patch(
+              uri,
+              headers: headers,
+              body: body == null ? null : jsonEncode(body),
+            )
+            .timeout(timeout);
       case ApiMethods.delete:
         return _httpClient.delete(uri, headers: headers).timeout(timeout);
       default:
@@ -443,7 +451,26 @@ class VendorApiService {
       authTokenOverride: authToken,
     );
 
-    return Product.fromJson(response['data']);
+    return Product.fromJson(_extractProductJson(response));
+  }
+
+  static Map<String, dynamic> _extractProductJson(Map<String, dynamic> data) {
+    Map<String, dynamic>? asMap(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return Map<String, dynamic>.from(value);
+      }
+      return null;
+    }
+
+    final payload = asMap(data['data']) ?? data;
+    final nestedProduct =
+        asMap(payload['product']) ??
+        asMap(payload['item']) ??
+        asMap(payload['result']);
+    return nestedProduct ?? payload;
   }
 
   static Future<Product> createProductWithImages(
@@ -479,7 +506,7 @@ class VendorApiService {
       final file = imageFiles[i];
       final fileSize = await file.length();
       SecureLogger.info(
-        'File $i: ${file.path} (${fileSize ~/ 1024}KB)',
+        'Attaching product image ${i + 1} (${fileSize ~/ 1024}KB)',
         tag: 'PRODUCTS',
       );
       request.files.add(await http.MultipartFile.fromPath('images', file.path));
@@ -508,16 +535,10 @@ class VendorApiService {
         'Response status: ${response.statusCode}',
         tag: 'PRODUCTS',
       );
-      SecureLogger.info('Response body: ${response.body}', tag: 'PRODUCTS');
-
       final data = _apiClient._decodeResponseBody(response.body);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final payload = data['data'];
-        if (payload is Map<String, dynamic>) {
-          return Product.fromJson(payload);
-        }
-        return Product.fromJson(Map<String, dynamic>.from(data));
+        return Product.fromJson(_extractProductJson(data));
       }
 
       throw VendorApiException(
@@ -576,10 +597,7 @@ class VendorApiService {
           } else {
             request.fields[key] = value.toString();
           }
-          SecureLogger.info(
-            'Field: $key = ${value.toString()}',
-            tag: 'PRODUCTS',
-          );
+          SecureLogger.info('Prepared update field: $key', tag: 'PRODUCTS');
         }
       });
 
@@ -589,7 +607,7 @@ class VendorApiService {
         final fileSize = await file.length();
         final fileNumber = i + 1;
         SecureLogger.info(
-          'Attaching file $fileNumber: ${file.path} ($fileSize bytes)',
+          'Attaching update image $fileNumber ($fileSize bytes)',
           tag: 'PRODUCTS',
         );
 
@@ -601,8 +619,6 @@ class VendorApiService {
         );
       }
 
-      // DEBUG: Print final request details
-      SecureLogger.info('Request headers: ${request.headers}', tag: 'PRODUCTS');
       SecureLogger.info(
         'Request fields count: ${request.fields.length}',
         tag: 'PRODUCTS',
@@ -625,26 +641,15 @@ class VendorApiService {
           'Response status: ${response.statusCode}',
           tag: 'PRODUCTS',
         );
-        SecureLogger.info('Response body: ${response.body}', tag: 'PRODUCTS');
-
         final data = _apiClient._decodeResponseBody(response.body);
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          final payload = data['data'];
-          final productJson = payload is Map<String, dynamic>
-              ? payload
-              : Map<String, dynamic>.from(data);
-          final updatedProduct = Product.fromJson(productJson);
+          final updatedProduct = Product.fromJson(_extractProductJson(data));
 
           SecureLogger.info(
             'Product updated successfully with ${imageFiles.length} images',
             tag: 'PRODUCTS',
           );
-          SecureLogger.info(
-            'Updated product images: ${updatedProduct.images}',
-            tag: 'PRODUCTS',
-          );
-
           return updatedProduct;
         }
 
@@ -675,11 +680,7 @@ class VendorApiService {
         authTokenOverride: authToken,
       );
 
-      final payload = response['data'];
-      final productJson = payload is Map<String, dynamic>
-          ? payload
-          : Map<String, dynamic>.from(response);
-      final updatedProduct = Product.fromJson(productJson);
+      final updatedProduct = Product.fromJson(_extractProductJson(response));
 
       SecureLogger.info(
         'Product updated successfully (JSON only)',
@@ -728,11 +729,7 @@ class VendorApiService {
       final data = _apiClient._decodeResponseBody(response.body);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final payload = data['data'];
-        final productJson = payload is Map<String, dynamic>
-            ? payload
-            : Map<String, dynamic>.from(data);
-        return Product.fromJson(productJson);
+        return Product.fromJson(_extractProductJson(data));
       }
 
       throw VendorApiException(
@@ -749,11 +746,7 @@ class VendorApiService {
         authTokenOverride: authToken,
       );
 
-      final payload = response['data'];
-      final productJson = payload is Map<String, dynamic>
-          ? payload
-          : Map<String, dynamic>.from(response);
-      return Product.fromJson(productJson);
+      return Product.fromJson(_extractProductJson(response));
     }
   }
 
@@ -777,7 +770,7 @@ class VendorApiService {
         imageFiles,
         authToken: authToken,
         baseUrl: _apiClient._baseUrl,
-        endpoint: '/$vendorId/products/$productId/upload-images',
+        endpoint: ApiEndpoints.uploadProductImages,
       );
 
       final successfulUploads = results.where((r) => r.success).toList();
@@ -1089,12 +1082,25 @@ class VendorApiService {
   static Future<Map<String, dynamic>> markNotificationAsRead(
     String notificationId,
     String authToken,
-  ) {
-    return _makeRequest(
-      ApiMethods.put,
-      ApiEndpoints.markNotificationRead(notificationId),
-      authTokenOverride: authToken,
-    );
+  ) async {
+    try {
+      return await _makeRequest(
+        ApiMethods.put,
+        ApiEndpoints.markNotificationRead(notificationId),
+        authTokenOverride: authToken,
+      );
+    } on VendorApiException catch (e) {
+      if (e.statusCode == ApiStatusCodes.notFound ||
+          e.statusCode == ApiStatusCodes.forbidden ||
+          e.statusCode == 405) {
+        return _makeRequest(
+          ApiMethods.put,
+          ApiEndpoints.markAllNotificationsRead,
+          authTokenOverride: authToken,
+        );
+      }
+      rethrow;
+    }
   }
 
   static Future<Map<String, dynamic>> markAllNotificationsAsRead(
@@ -1134,10 +1140,11 @@ class VendorApiService {
     String notificationId,
     String authToken,
   ) {
-    return Future.value(<String, dynamic>{
-      'success': false,
-      'message': 'Delete notification endpoint is not available.',
-    });
+    return _makeRequest(
+      ApiMethods.delete,
+      ApiEndpoints.notificationById(notificationId),
+      authTokenOverride: authToken,
+    );
   }
 
   static Future<Map<String, dynamic>> clearAllNotifications(String authToken) {

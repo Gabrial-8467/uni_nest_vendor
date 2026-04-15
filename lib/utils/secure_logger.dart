@@ -38,7 +38,7 @@ class SecureLogger {
     final logMessage = '[$timestamp] [$level] ${tag != null ? '[$tag] ' : ''}$sanitizedMessage';
 
     if (error != null) {
-      debugPrint('$logMessage\nError: $error');
+      debugPrint('$logMessage\nError: ${_sanitizeError(error)}');
     } else {
       debugPrint(logMessage);
     }
@@ -90,6 +90,10 @@ class SecureLogger {
   static String _truncateForLog(String value) {
     if (value.length <= _maxPayloadLogChars) return value;
     return '${value.substring(0, _maxPayloadLogChars)}... [truncated ${value.length - _maxPayloadLogChars} chars]';
+  }
+
+  static String _sanitizeError(Object error) {
+    return _truncateForLog(_sanitizeMessage(error.toString()));
   }
 
   // Sanitize URL to remove sensitive query parameters
@@ -178,17 +182,31 @@ class SecureLogger {
     if (body is String) {
       try {
         final decoded = jsonDecode(body);
-        final sanitized = _sanitizeMap(decoded);
-        return jsonEncode(sanitized);
+        return jsonEncode(_sanitizeJsonValue(decoded));
       } catch (e) {
         return _sanitizeMessage(body);
       }
     } else if (body is Map<String, dynamic>) {
-      final sanitized = _sanitizeMap(body);
-      return jsonEncode(sanitized);
+      return jsonEncode(_sanitizeMap(body));
     } else {
-      return body.toString();
+      return _sanitizeMessage(body.toString());
     }
+  }
+
+  static dynamic _sanitizeJsonValue(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return _sanitizeMap(value);
+    }
+    if (value is Map) {
+      return _sanitizeMap(Map<String, dynamic>.from(value));
+    }
+    if (value is List) {
+      return value.map(_sanitizeJsonValue).toList();
+    }
+    if (value is String) {
+      return _sanitizeMessage(value);
+    }
+    return value;
   }
 
   // Performance logging
@@ -231,9 +249,11 @@ class SecureLogger {
     final logMessage = _sanitizeMessage(message);
     if (error != null) {
       if (stackTrace != null) {
-        debugPrint('[$tag] ERROR: $logMessage\nError: $error\nStack Trace:\n$stackTrace');
+        debugPrint(
+          '[$tag] ERROR: $logMessage\nError: ${_sanitizeError(error)}\nStack Trace:\n$stackTrace',
+        );
       } else {
-        debugPrint('[$tag] ERROR: $logMessage\nError: $error');
+        debugPrint('[$tag] ERROR: $logMessage\nError: ${_sanitizeError(error)}');
       }
     } else {
       debugPrint('[$tag] ERROR: $logMessage');

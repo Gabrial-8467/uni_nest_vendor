@@ -37,26 +37,38 @@ class VendorNotification {
   /// Creates VendorNotification from backend JSON response
   factory VendorNotification.fromJson(Map<String, dynamic> json) {
     try {
+      final status = json['status']?.toString().toLowerCase() ?? '';
       return VendorNotification(
         id: json['_id'] as String? ?? json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
+        title:
+            json['title'] as String? ??
+            json['subject'] as String? ??
+            'Notification',
         body: json['message'] as String? ?? json['body'] as String? ?? '',
         type: json['type'] as String? ?? 'system',
-        isRead: json['isRead'] as bool? ?? false,
+        isRead: json['isRead'] as bool? ?? status == 'read',
         createdAt: _parseDateTime(json['createdAt']),
-        data: json['data'] as Map<String, dynamic>?,
+        data: json['data'] is Map
+            ? Map<String, dynamic>.from(json['data'] as Map)
+            : null,
       );
     } catch (e) {
       debugPrint('Error parsing VendorNotification: $e');
       // Return safe default on parsing error
+      final status = json['status']?.toString().toLowerCase() ?? '';
       return VendorNotification(
         id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
-        title: json['title']?.toString() ?? 'Notification',
+        title:
+            json['title']?.toString() ??
+            json['subject']?.toString() ??
+            'Notification',
         body: json['message']?.toString() ?? json['body']?.toString() ?? '',
         type: json['type']?.toString() ?? 'system',
-        isRead: json['isRead'] as bool? ?? false,
+        isRead: json['isRead'] as bool? ?? status == 'read',
         createdAt: _parseDateTime(json['createdAt']),
-        data: json['data'] as Map<String, dynamic>?,
+        data: json['data'] is Map
+            ? Map<String, dynamic>.from(json['data'] as Map)
+            : null,
       );
     }
   }

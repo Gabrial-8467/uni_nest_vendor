@@ -20,6 +20,9 @@ class VendorProvider extends ChangeNotifier {
   VendorLedger? _ledger;
   Map<String, dynamic> _earnings = {};
   Map<String, dynamic> _settings = {};
+  DateTime? _productsLastLoadedAt;
+  Future<void>? _productsLoadFuture;
+  static const Duration _productsCacheTtl = Duration(minutes: 2);
 
   // Loading States
   bool _isLoading = false;
@@ -417,6 +420,8 @@ class VendorProvider extends ChangeNotifier {
       _currentVendor = null;
       _isAuthenticated = false;
       _products = [];
+      _productsLastLoadedAt = null;
+      _productsLoadFuture = null;
       _orders = [];
       _payouts = [];
       _analytics = null;
@@ -431,14 +436,14 @@ class VendorProvider extends ChangeNotifier {
   }
 
   // Load vendor data
-  Future<void> loadVendorData() async {
+  Future<void> loadVendorData({bool forceProducts = false}) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
     await Future.wait([
       loadVendorProfile(),
-      loadProducts(),
+      loadProducts(force: forceProducts),
       loadOrders(),
       loadAnalytics(),
       loadEarnings(),
@@ -448,8 +453,39 @@ class VendorProvider extends ChangeNotifier {
     ]);
   }
 
+  bool get _hasFreshProductsCache {
+    if (_productsLastLoadedAt == null) {
+      return false;
+    }
+
+    return DateTime.now().difference(_productsLastLoadedAt!) <
+        _productsCacheTtl;
+  }
+
   // Load products
-  Future<void> loadProducts() async {
+  Future<void> loadProducts({bool force = false}) async {
+    if (!force && _hasFreshProductsCache) {
+      SecureLogger.info(
+        'Using cached products (${_products.length})',
+        tag: 'PRODUCTS',
+      );
+      return;
+    }
+
+    if (_productsLoadFuture != null) {
+      SecureLogger.info('Reusing in-flight products request', tag: 'PRODUCTS');
+      return _productsLoadFuture;
+    }
+
+    _productsLoadFuture = _loadProductsFromServer();
+    try {
+      await _productsLoadFuture;
+    } finally {
+      _productsLoadFuture = null;
+    }
+  }
+
+  Future<void> _loadProductsFromServer() async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
@@ -459,6 +495,7 @@ class VendorProvider extends ChangeNotifier {
 
     try {
       _products = await VendorApiService.getVendorProducts(_authToken!);
+      _productsLastLoadedAt = DateTime.now();
       SecureLogger.info('Loaded ${_products.length} products', tag: 'PRODUCTS');
     } catch (e) {
       await _handleUnauthorizedIfNeeded(e);
@@ -768,6 +805,7 @@ class VendorProvider extends ChangeNotifier {
       SecureLogger.info('API call completed successfully', tag: 'PRODUCTS');
 
       _products.insert(0, newProduct);
+      _productsLastLoadedAt = DateTime.now();
 
       SecureLogger.info('Product created: ${newProduct.name}', tag: 'PRODUCTS');
       return true;
@@ -804,14 +842,16 @@ class VendorProvider extends ChangeNotifier {
       final index = _products.indexWhere((p) => p.id == productId);
       if (index != -1) {
         _products[index] = updatedProduct;
+      } else {
+        _products.insert(0, updatedProduct);
       }
+      _productsLastLoadedAt = DateTime.now();
 
       SecureLogger.info(
         'Product updated: ${updatedProduct.name}',
         tag: 'PRODUCTS',
       );
 
-      await loadProducts();
       return true;
     } catch (e) {
       _error = 'Failed to update product: ${e.toString()}';
@@ -834,6 +874,7 @@ class VendorProvider extends ChangeNotifier {
     try {
       await VendorApiService.deleteProduct(productId, _authToken!);
       _products.removeWhere((p) => p.id == productId);
+      _productsLastLoadedAt = DateTime.now();
 
       SecureLogger.info('Product deleted: $productId', tag: 'PRODUCTS');
       return true;
@@ -883,7 +924,7 @@ class VendorProvider extends ChangeNotifier {
   // Refresh data
   Future<void> refreshData() async {
     if (_isAuthenticated) {
-      await loadVendorData();
+      await loadVendorData(forceProducts: true);
     }
   }
 

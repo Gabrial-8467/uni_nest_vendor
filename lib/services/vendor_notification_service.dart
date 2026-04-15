@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/vendor_config.dart';
 import '../models/vendor_notification.dart';
+import '../utils/secure_logger.dart';
 import 'auth_service.dart';
 
 /// Clean API service for vendor notifications
@@ -17,20 +17,33 @@ class VendorNotificationService {
       final response = await _makeRequest('GET', '/notifications');
 
       if (response['success'] == true && response['data'] != null) {
-        final notificationsData = response['data'] as List? ?? [];
+        final data = response['data'];
+        final notificationsData = data is List
+            ? data
+            : data is Map<String, dynamic>
+            ? ((data['notifications'] ??
+                      data['items'] ??
+                      data['results']) as List? ??
+                  const [])
+            : const [];
 
-        debugPrint(
+        SecureLogger.info(
           'Fetched ${notificationsData.length} notifications from backend',
+          tag: 'NOTIFICATIONS',
         );
 
-        return notificationsData.map((json) {
-          return VendorNotification.fromJson(json as Map<String, dynamic>);
+        return notificationsData.whereType<Map>().map((json) {
+          return VendorNotification.fromJson(Map<String, dynamic>.from(json));
         }).toList();
       } else {
         throw Exception(response['message'] ?? 'Failed to load notifications');
       }
     } catch (e) {
-      debugPrint('Error in getNotifications: $e');
+      SecureLogger.error(
+        'Error in getNotifications',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       throw Exception('Failed to load notifications: $e');
     }
   }
@@ -40,9 +53,9 @@ class VendorNotificationService {
     try {
       await _makeRequest('PUT', '/notifications/mark-all-read');
 
-      debugPrint('Marked all notifications as read');
+      SecureLogger.info('Marked all notifications as read', tag: 'NOTIFICATIONS');
     } catch (e) {
-      debugPrint('Error in markAllRead: $e');
+      SecureLogger.error('Error in markAllRead', error: e, tag: 'NOTIFICATIONS');
       throw Exception('Failed to mark all notifications as read: $e');
     }
   }
@@ -50,12 +63,27 @@ class VendorNotificationService {
   /// Mark a specific notification as read
   static Future<void> markAsRead(String notificationId) async {
     try {
-      await _makeRequest('PUT', '/notifications/$notificationId/read');
+      try {
+        await _makeRequest('PUT', '/notifications/$notificationId/read');
+      } catch (_) {
+        await markAllRead();
+      }
 
-      debugPrint('Marked notification $notificationId as read');
+      SecureLogger.info('Marked notification as read', tag: 'NOTIFICATIONS');
     } catch (e) {
-      debugPrint('Error in markAsRead: $e');
+      SecureLogger.error('Error in markAsRead', error: e, tag: 'NOTIFICATIONS');
       throw Exception('Failed to mark notification as read: $e');
+    }
+  }
+
+  /// Clear all notifications
+  static Future<void> clearAll() async {
+    try {
+      await _makeRequest('DELETE', '/notifications/clear-all');
+      SecureLogger.info('Cleared all notifications', tag: 'NOTIFICATIONS');
+    } catch (e) {
+      SecureLogger.error('Error in clearAll', error: e, tag: 'NOTIFICATIONS');
+      throw Exception('Failed to clear notifications: $e');
     }
   }
 
@@ -64,9 +92,13 @@ class VendorNotificationService {
     try {
       await _makeRequest('DELETE', '/notifications/$notificationId');
 
-      debugPrint('Deleted notification $notificationId');
+      SecureLogger.info('Deleted notification', tag: 'NOTIFICATIONS');
     } catch (e) {
-      debugPrint('Error in deleteNotification: $e');
+      SecureLogger.error(
+        'Error in deleteNotification',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       throw Exception('Failed to delete notification: $e');
     }
   }
@@ -107,6 +139,15 @@ class VendorNotificationService {
               )
               .timeout(_timeout);
           break;
+        case 'PUT':
+          response = await http
+              .put(
+                uri,
+                headers: headers,
+                body: body != null ? jsonEncode(body) : null,
+              )
+              .timeout(_timeout);
+          break;
         case 'DELETE':
           response = await http.delete(uri, headers: headers).timeout(_timeout);
           break;
@@ -114,11 +155,19 @@ class VendorNotificationService {
           throw Exception('Unsupported HTTP method: $method');
       }
 
-      final responseBody = response.body.isNotEmpty
-          ? jsonDecode(response.body) as Map<String, dynamic>
+      final decodedBody = response.body.isNotEmpty
+          ? jsonDecode(response.body)
           : <String, dynamic>{};
+      final responseBody = decodedBody is Map<String, dynamic>
+          ? decodedBody
+          : decodedBody is Map
+          ? Map<String, dynamic>.from(decodedBody)
+          : <String, dynamic>{'data': decodedBody};
 
-      debugPrint('API Response: ${response.statusCode} - $responseBody');
+      SecureLogger.info(
+        'Notification API response: ${response.statusCode}',
+        tag: 'NOTIFICATIONS',
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return responseBody;
@@ -129,7 +178,11 @@ class VendorNotificationService {
         );
       }
     } catch (e) {
-      debugPrint('HTTP Request Error: $e');
+      SecureLogger.error(
+        'Notification HTTP request error',
+        error: e,
+        tag: 'NOTIFICATIONS',
+      );
       throw Exception('Network error: $e');
     }
   }

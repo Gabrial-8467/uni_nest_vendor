@@ -172,6 +172,7 @@ class SecurityValidator {
         'canteen',
         'restaurant',
         'cafe',
+        'food truck',
         'food_truck',
         'other',
       ];

@@ -3,6 +3,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'environment_config.dart';
 
 class VendorConfig {
+  static String _trimTrailingSlash(String url) {
+    return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  }
+
   // Environment configuration
   static bool get isDebugMode => kDebugMode;
   static bool get isReleaseMode => kReleaseMode;
@@ -34,6 +38,14 @@ class VendorConfig {
 
     // Production fallback
     return 'https://uninest-backend.onrender.com/api/vendor';
+  }
+
+  static String get apiRootUrl {
+    final normalized = _trimTrailingSlash(apiBaseUrl);
+    if (normalized.endsWith('/vendor')) {
+      return normalized.substring(0, normalized.length - '/vendor'.length);
+    }
+    return normalized;
   }
 
   // Debug method to check current API URL
@@ -137,6 +149,24 @@ class VendorConfig {
     return true;
   }
 
+  static String? get realtimeNotificationsUrl {
+    final envUrl = dotenv.env['VENDOR_WS_URL'];
+    final buildUrl = String.fromEnvironment('VENDOR_WS_URL');
+    final url = (envUrl != null && envUrl.trim().isNotEmpty)
+        ? envUrl.trim()
+        : buildUrl.trim();
+
+    if (url.isEmpty) {
+      return null;
+    }
+
+    if (enforceHttps && url.toLowerCase().startsWith('ws://')) {
+      return null;
+    }
+
+    return url;
+  }
+
   // App Configuration
   static String get appName => 'UNI NEST Vendor';
   static String get appVersion => '1.0.0';
@@ -210,9 +240,8 @@ class VendorConfig {
     'canteen',
     'cafe',
     'restaurant',
-    'food_truck',
-    'mess',
-    'kiosk',
+    'food truck',
+    'other',
   ];
 
   // Image Upload Configuration

@@ -23,18 +23,28 @@ class VendorProfile {
     final user = json['user'] is Map<String, dynamic>
         ? json['user'] as Map<String, dynamic>
         : <String, dynamic>{};
+    final contactInfo = json['contactInfo'] is Map<String, dynamic>
+        ? json['contactInfo'] as Map<String, dynamic>
+        : <String, dynamic>{};
     return VendorProfile(
       id: (json['_id'] ?? json['id'] ?? user['_id'] ?? '').toString(),
       name: (json['name'] ?? user['name'] ?? '').toString(),
-      email: (json['email'] ?? user['email'] ?? '').toString(),
+      email: (json['email'] ?? contactInfo['email'] ?? user['email'] ?? '')
+          .toString(),
       businessName: (json['businessName'] ?? '').toString(),
-      phone: (json['phone'] ?? user['phone'] ?? '').toString(),
+      phone: (json['phone'] ?? contactInfo['phone'] ?? user['phone'] ?? '')
+          .toString(),
       businessType: (json['businessType'] ?? '').toString().trim().isEmpty
           ? null
           : (json['businessType'] ?? '').toString(),
-      avatarUrl: (user['avatar'] ?? json['avatar'] ?? '').toString().trim().isEmpty
+      avatarUrl:
+          (user['avatar'] ?? json['avatar'] ?? json['profileImage'] ?? '')
+              .toString()
+              .trim()
+              .isEmpty
           ? null
-          : (user['avatar'] ?? json['avatar']).toString(),
+          : (user['avatar'] ?? json['avatar'] ?? json['profileImage'])
+                .toString(),
       description: (json['description'] ?? '').toString().trim().isEmpty
           ? null
           : (json['description'] ?? '').toString(),

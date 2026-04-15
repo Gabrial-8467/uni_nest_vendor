@@ -122,7 +122,7 @@ class _VendorShellScreenState extends ConsumerState<VendorShellScreen> {
     final notifications = ref.watch(vendorNotificationProvider);
     final pages = const [
       VendorDashboardTab(),
-      VendorOrdersTab(),
+      VendorOrdersTab(showAppBar: false),
       VendorLedgerTab(),
       VendorPayoutsTab(),
       VendorProfileTab(),
