@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config/vendor_config.dart';
@@ -301,20 +302,38 @@ class VendorApiClient {
         .toList();
   }
 
+  /// Get vendor dashboard data
+  Future<Map<String, dynamic>> getDashboard() async {
+    final response = await _request(method: 'GET', path: '/dashboard');
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return <String, dynamic>{};
+  }
+
+  /// Get vendor analytics
+  Future<Map<String, dynamic>> getAnalytics({String? period}) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/analytics',
+      queryParameters: period != null ? {'period': period} : null,
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return <String, dynamic>{};
+  }
+
   Future<void> markAllNotificationsRead() async {
     await _request(method: 'PUT', path: '/notifications/mark-all-read');
   }
 
   Future<void> markNotificationRead(String notificationId) async {
-    try {
-      await _request(method: 'PUT', path: '/notifications/$notificationId/read');
-    } on VendorApiException catch (error) {
-      if (error.statusCode == 404 || error.statusCode == 405) {
-        await markAllNotificationsRead();
-        return;
-      }
-      rethrow;
-    }
+    // Backend does not have individual notification read endpoint
+    // Only mark-all-read is available, so we call that instead
+    await markAllNotificationsRead();
   }
 
   Future<void> clearAllNotifications() async {
@@ -411,6 +430,7 @@ class VendorApiClient {
     }
 
     final decoded = _decodeResponse(response.body);
+    debugPrint('API Response: ${response.statusCode} - $decoded');
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (normalizedMethod == 'GET') {
         _getCache[cacheKey] = _CachedResponse(decoded);
@@ -424,8 +444,13 @@ class VendorApiClient {
       await clearSession();
     }
 
+    final errorMsg =
+        decoded['message']?.toString() ??
+        decoded['error']?.toString() ??
+        'Request failed';
+    debugPrint('API Error: $errorMsg (status: ${response.statusCode})');
     throw VendorApiException(
-      decoded['message']?.toString() ?? 'Request failed',
+      errorMsg,
       statusCode: response.statusCode,
       payload: decoded,
     );

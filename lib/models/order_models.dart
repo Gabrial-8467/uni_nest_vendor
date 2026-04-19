@@ -147,6 +147,8 @@ class VendorOrder {
         return 'ready';
       case 'ready':
         return 'out_for_delivery';
+      case 'out_for_delivery':
+        return 'delivered';
       default:
         return null;
     }

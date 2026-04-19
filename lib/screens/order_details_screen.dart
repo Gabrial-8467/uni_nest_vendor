@@ -212,7 +212,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             Expanded(
               flex: 2,
               child: ElevatedButton(
-                onPressed: isBusy
+                onPressed: isBusy || order.nextStatus == null
                     ? null
                     : () => _handlePrimaryAction(context, ref, order!),
                 child: isBusy
@@ -287,17 +287,22 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       if (otp == null || otp.isEmpty) {
         return;
       }
+      debugPrint('Verifying OTP for order: ${order.id}, OTP: $otp');
       final success = await ref
           .read(orderProvider.notifier)
           .verifyDeliveryOtp(orderId: order.id, otp: otp);
+      final errorMsg = ref.read(orderProvider).errorMessage;
+      debugPrint('OTP verification result: success=$success, error=$errorMsg');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            backgroundColor: success ? Colors.green : Colors.red,
             content: Text(
               success
                   ? 'OTP verified. Order marked delivered.'
-                  : ref.read(orderProvider).errorMessage ??
-                        'OTP verification failed',
+                  : (errorMsg?.isNotEmpty == true)
+                  ? 'Error: $errorMsg'
+                  : 'OTP verification failed',
             ),
           ),
         );

@@ -76,55 +76,61 @@ class VendorNotificationScreen extends ConsumerWidget {
       ),
       actions: [
         if (state.notifications.isNotEmpty)
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'mark_all_read':
-                  ref.read(vendorNotificationProvider.notifier).markAllAsRead();
-                  break;
-                case 'refresh':
-                  ref
-                      .read(vendorNotificationProvider.notifier)
-                      .loadNotifications(force: true);
-                  break;
-                case 'clear_all':
-                  _showClearAllDialog(context, ref);
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'mark_all_read',
-                child: Row(
-                  children: [
-                    Icon(Icons.mark_email_read_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Mark all as read'),
-                  ],
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: PopupMenuButton<String>(
+              offset: const Offset(0, 40),
+              onSelected: (value) {
+                switch (value) {
+                  case 'mark_all_read':
+                    ref
+                        .read(vendorNotificationProvider.notifier)
+                        .markAllAsRead();
+                    break;
+                  case 'refresh':
+                    ref
+                        .read(vendorNotificationProvider.notifier)
+                        .loadNotifications(force: true);
+                    break;
+                  case 'clear_all':
+                    _showClearAllDialog(context, ref);
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'mark_all_read',
+                  child: Row(
+                    children: [
+                      Icon(Icons.mark_email_read_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mark all as read'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'refresh',
-                child: Row(
-                  children: [
-                    Icon(Icons.refresh, size: 18),
-                    SizedBox(width: 8),
-                    Text('Refresh'),
-                  ],
+                const PopupMenuItem(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh, size: 18),
+                      SizedBox(width: 8),
+                      Text('Refresh'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'clear_all',
-                child: Row(
-                  children: [
-                    Icon(Icons.clear_all_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Clear all'),
-                  ],
+                const PopupMenuItem(
+                  value: 'clear_all',
+                  child: Row(
+                    children: [
+                      Icon(Icons.clear_all_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Clear all'),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-            child: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
+              ],
+              child: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
+            ),
           ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/order_models.dart';
@@ -125,9 +126,9 @@ class OrderController extends StateNotifier<OrderState> {
     }
 
     try {
-      final order = await _ref.read(vendorApiClientProvider).getOrderById(
-        orderId,
-      );
+      final order = await _ref
+          .read(vendorApiClientProvider)
+          .getOrderById(orderId);
       final updatedOrders = [
         for (final existing in state.orders)
           if (existing.id == order.id) order else existing,
@@ -177,13 +178,24 @@ class OrderController extends StateNotifier<OrderState> {
     state = state.copyWith(activeOrderIds: nextActive, clearError: true);
     try {
       final updatedOrder = await action();
+      // Match by both id and orderNumber since backend might return different formats
       final updatedOrders = [
         for (final order in state.orders)
-          if (order.id == orderId) updatedOrder else order,
+          if (order.id == orderId || order.orderNumber == orderId)
+            updatedOrder
+          else
+            order,
       ];
+      // If order wasn't found in existing list, add it
+      final orderExists = state.orders.any(
+        (o) => o.id == orderId || o.orderNumber == orderId,
+      );
+      final finalOrders = orderExists
+          ? updatedOrders
+          : [...updatedOrders, updatedOrder];
       nextActive.remove(orderId);
       state = state.copyWith(
-        orders: updatedOrders,
+        orders: finalOrders,
         activeOrderIds: nextActive,
         lastUpdatedAt: DateTime.now(),
       );
@@ -192,9 +204,11 @@ class OrderController extends StateNotifier<OrderState> {
       return true;
     } catch (error) {
       nextActive.remove(orderId);
+      final errorMsg = error.toString();
+      debugPrint('Order action failed for order $orderId: $errorMsg');
       state = state.copyWith(
         activeOrderIds: nextActive,
-        errorMessage: error.toString(),
+        errorMessage: errorMsg,
       );
       return false;
     }

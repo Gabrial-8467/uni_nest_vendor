@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vendor_notification.dart';
 import '../providers/vendor_notification_provider.dart';
-import '../screens/order_details_screen.dart';
 import '../utils/app_theme.dart';
 
 /// Widget that listens for new notifications and shows toast messages
@@ -94,40 +93,8 @@ class _ToastNotificationListenerState
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        action: SnackBarAction(
-          label: 'VIEW',
-          textColor: Colors.white,
-          onPressed: () {
-            _handleNotificationTap(notification);
-          },
-        ),
       ),
     );
-  }
-
-  void _handleNotificationTap(VendorNotification notification) {
-    // Navigate based on notification type
-    switch (notification.type) {
-      case 'order':
-        if (notification.data?['orderId'] != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  OrderDetailsScreen(orderId: notification.data!['orderId']),
-            ),
-          );
-        }
-        break;
-      case 'payment':
-        Navigator.of(context).pushNamed('/ledger');
-        break;
-      case 'vendor_approval':
-      case 'vendor_status':
-        Navigator.of(context).pushNamed('/profile');
-        break;
-      default:
-        Navigator.of(context).pushNamed('/notifications');
-    }
   }
 
   IconData _getNotificationIcon(String type) {
