@@ -192,12 +192,17 @@ class _VendorLoginScreenState extends ConsumerState<VendorLoginScreen> {
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
-              child: Text(
-                'Forgot Password?',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, '/forgot-password');
+                },
+                child: Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ),

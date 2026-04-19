@@ -49,6 +49,7 @@ import 'utils/performance_optimizer.dart';
 import 'screens/auth_gate_screen.dart';
 import 'screens/vendor_signup_screen.dart';
 import 'screens/vendor_shell_screen.dart';
+import 'screens/vendor_forgot_password_screen.dart';
 import 'widgets/permission_request_widget.dart';
 
 void main() async {
@@ -126,6 +127,7 @@ class UNINestVendorApp extends StatelessWidget {
             '/auth': (context) => const VendorAuthGateScreen(),
             '/dashboard': (context) => const VendorShellScreen(),
             '/signup': (context) => const VendorSignupScreen(),
+            '/forgot-password': (context) => const VendorForgotPasswordScreen(),
           },
         ),
       ),

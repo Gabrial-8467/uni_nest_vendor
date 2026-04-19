@@ -353,19 +353,21 @@ class ErrorHandler {
     }
   }
 
-  void showUserFriendlyError(BuildContext context, AppError error) {
+  void showUserFriendlyError(
+    BuildContext context,
+    AppError error, {
+    VoidCallback? onRetry,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(getUserFriendlyMessage(error)),
         backgroundColor: _getErrorColor(error.type),
         duration: const Duration(seconds: 5),
-        action: error.type == ErrorType.network
+        action: error.type == ErrorType.network && onRetry != null
             ? SnackBarAction(
                 label: 'Retry',
                 textColor: Colors.white,
-                onPressed: () {
-                  // Trigger retry logic if needed
-                },
+                onPressed: onRetry,
               )
             : null,
       ),

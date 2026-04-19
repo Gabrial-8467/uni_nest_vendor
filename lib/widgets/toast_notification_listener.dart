@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vendor_notification.dart';
 import '../providers/vendor_notification_provider.dart';
+import '../screens/order_details_screen.dart';
 import '../utils/app_theme.dart';
 
 /// Widget that listens for new notifications and shows toast messages
@@ -109,9 +110,11 @@ class _ToastNotificationListenerState
     switch (notification.type) {
       case 'order':
         if (notification.data?['orderId'] != null) {
-          Navigator.of(context).pushNamed(
-            '/orders',
-            arguments: {'orderId': notification.data!['orderId']},
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  OrderDetailsScreen(orderId: notification.data!['orderId']),
+            ),
           );
         }
         break;
