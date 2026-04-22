@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vendor_notification.dart';
+import '../providers/order_provider.dart';
 import '../providers/vendor_notification_provider.dart';
 import '../utils/app_theme.dart';
 
@@ -19,7 +20,12 @@ class ToastNotificationListener extends ConsumerStatefulWidget {
 
 class _ToastNotificationListenerState
     extends ConsumerState<ToastNotificationListener> {
-  final List<String> _shownNotificationIds = [];
+  static const Duration _orderToastFreshnessTolerance = Duration(seconds: 15);
+
+  final Set<String> _knownNotificationIds = {};
+  final DateTime _mountedAt = DateTime.now();
+  bool _hasSeededExistingNotifications = false;
+  DateTime? _toastEnabledAt;
 
   @override
   Widget build(BuildContext context) {
@@ -30,24 +36,143 @@ class _ToastNotificationListenerState
     ) {
       if (previous == null) return;
 
+      if (!_hasSeededExistingNotifications) {
+        if (current.isLoading) {
+          return;
+        }
+
+        _rememberNotifications(current.notifications);
+        _hasSeededExistingNotifications = true;
+        _toastEnabledAt = DateTime.now();
+        return;
+      }
+
       // Check if new notifications were added
       if (current.notifications.length > previous.notifications.length) {
         // Find the newest notification
         final newNotifications = current.notifications
-            .where((n) => !previous.notifications.any((p) => p.id == n.id))
+            .where((n) => !_knownNotificationIds.contains(n.id))
             .toList();
 
         for (final notification in newNotifications) {
-          // Only show if not already shown
-          if (!_shownNotificationIds.contains(notification.id)) {
-            _shownNotificationIds.add(notification.id);
-            _showToastNotification(context, notification);
+          _knownNotificationIds.add(notification.id);
+
+          if (!_shouldShowToast(notification)) {
+            continue;
           }
+
+          _showToastNotification(context, notification);
         }
       }
     });
 
     return widget.child;
+  }
+
+  void _rememberNotifications(List<VendorNotification> notifications) {
+    _knownNotificationIds.addAll(notifications.map((item) => item.id));
+  }
+
+  bool _shouldShowToast(VendorNotification notification) {
+    final eventText = _orderEventText(notification);
+    final status = _orderStatus(notification);
+    final isOrderNotification =
+        notification.isOrder ||
+        eventText.contains('order') ||
+        notification.data?['orderId'] != null ||
+        notification.data?['order_id'] != null;
+
+    if (!isOrderNotification) {
+      return true;
+    }
+
+    if (!_isFreshOrderNotification(notification)) {
+      return false;
+    }
+
+    if (_isKnownOrder(notification)) {
+      return false;
+    }
+
+    if (_isCompletedOrderStatus(status) ||
+        eventText.contains('completed') ||
+        eventText.contains('delivered') ||
+        eventText.contains('cancelled') ||
+        eventText.contains('canceled') ||
+        eventText.contains('refunded')) {
+      return false;
+    }
+
+    return eventText.contains('new order') ||
+        eventText.contains('order placed') ||
+        eventText.contains('order created') ||
+        eventText.contains('order received') ||
+        status == 'pending' ||
+        status == 'confirmed';
+  }
+
+  bool _isFreshOrderNotification(VendorNotification notification) {
+    final toastEnabledAt = _toastEnabledAt ?? _mountedAt;
+    final oldestAllowedCreatedAt = toastEnabledAt.subtract(
+      _orderToastFreshnessTolerance,
+    );
+
+    return !notification.createdAt.isBefore(oldestAllowedCreatedAt);
+  }
+
+  bool _isKnownOrder(VendorNotification notification) {
+    final orderId = _notificationOrderId(notification);
+    if (orderId.isEmpty) {
+      return false;
+    }
+
+    return ref.read(orderProvider).orders.any((order) {
+      return order.id == orderId || order.orderNumber == orderId;
+    });
+  }
+
+  String _notificationOrderId(VendorNotification notification) {
+    final data = notification.data ?? const <String, dynamic>{};
+    return (data['orderId'] ??
+            data['order_id'] ??
+            data['orderNumber'] ??
+            data['order_number'] ??
+            '')
+        .toString();
+  }
+
+  String _orderEventText(VendorNotification notification) {
+    final data = notification.data ?? const <String, dynamic>{};
+    return [
+      notification.title,
+      notification.body,
+      data['event'],
+      data['action'],
+      data['notificationType'],
+      data['type'],
+    ].whereType<Object>().map((value) {
+      return value.toString().toLowerCase();
+    }).join(' ');
+  }
+
+  String _orderStatus(VendorNotification notification) {
+    final data = notification.data ?? const <String, dynamic>{};
+    return (data['orderStatus'] ??
+            data['order_status'] ??
+            data['status'] ??
+            data['newStatus'] ??
+            data['new_status'] ??
+            '')
+        .toString()
+        .toLowerCase();
+  }
+
+  bool _isCompletedOrderStatus(String status) {
+    return status == 'delivered' ||
+        status == 'completed' ||
+        status == 'cancelled' ||
+        status == 'canceled' ||
+        status == 'refunded';
   }
 
   void _showToastNotification(

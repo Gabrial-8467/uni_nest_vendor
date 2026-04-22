@@ -1,3 +1,15 @@
+/// Cross-Settlement Ledger Summary
+///
+/// Handles the cross-settlement between ONLINE and COD payments:
+/// - Online orders: Platform owes vendor (onlinePayable)
+/// - COD orders: Vendor owes platform fees (codPlatformReceivable)
+/// - Cross-settlement: COD fees offset against online earnings
+///
+/// Formula:
+/// - reconciledCodFees = min(onlinePayable, codPlatformReceivable)
+/// - netBeforePayout = onlinePayable - codPlatformReceivable
+/// - availableAmount = max(0, netBeforePayout - paidAmount)
+/// - platformReceivable = max(0, codPlatformReceivable - onlinePayable)
 class VendorLedgerSummary {
   VendorLedgerSummary({
     required this.totalEarnings,
@@ -7,6 +19,11 @@ class VendorLedgerSummary {
     required this.commissionOwed,
     required this.platformReceivable,
     required this.entries,
+    // Cross-settlement fields
+    this.onlineCommissionBalance,
+    this.reconciledCodFees,
+    this.grossOnlinePayable,
+    this.grossCodReceivable,
   });
 
   final double totalEarnings;
@@ -17,6 +34,22 @@ class VendorLedgerSummary {
   final double platformReceivable;
   final List<VendorLedgerEntry> entries;
 
+  // Cross-settlement fields
+  /// Online payable remaining after COD cross-settlement
+  final double? onlineCommissionBalance;
+
+  /// COD fees netted against online payable
+  final double? reconciledCodFees;
+
+  /// Gross online payable before cross-settlement
+  final double? grossOnlinePayable;
+
+  /// Gross COD fees vendor owes before cross-settlement
+  final double? grossCodReceivable;
+
+  /// Net amount vendor can withdraw (alias for availableBalance)
+  double get netAvailableAmount => availableBalance;
+
   factory VendorLedgerSummary.fromJson(Map<String, dynamic> json) {
     final rawEntries = json['entries'] ?? json['transactions'] ?? const [];
     return VendorLedgerSummary(
@@ -25,11 +58,15 @@ class VendorLedgerSummary {
         json['pendingBalance'] ?? json['pendingAmount'],
       ),
       availableBalance: _ledgerDouble(
-        json['availableBalance'] ?? json['availableAmount'],
+        json['availableBalance'] ??
+            json['availableAmount'] ??
+            json['netAvailableAmount'],
       ),
       paidOutAmount: _ledgerDouble(json['paidOutAmount'] ?? json['paidAmount']),
       commissionOwed: _ledgerDouble(
-        json['commissionOwed'] ?? json['totalCommissionOwed'],
+        json['commissionOwed'] ??
+            json['totalCommissionOwed'] ??
+            json['platformReceivable'],
       ),
       platformReceivable: _ledgerDouble(json['platformReceivable']),
       entries: (rawEntries as List)
@@ -39,6 +76,13 @@ class VendorLedgerSummary {
                 VendorLedgerEntry.fromJson(Map<String, dynamic>.from(entry)),
           )
           .toList(),
+      // Cross-settlement fields
+      onlineCommissionBalance: _ledgerDoubleOrNull(
+        json['onlineCommissionBalance'],
+      ),
+      reconciledCodFees: _ledgerDoubleOrNull(json['reconciledCodFees']),
+      grossOnlinePayable: _ledgerDoubleOrNull(json['grossOnlinePayable']),
+      grossCodReceivable: _ledgerDoubleOrNull(json['grossCodReceivable']),
     );
   }
 }
@@ -150,4 +194,12 @@ double _ledgerDouble(dynamic value) {
     return value.toDouble();
   }
   return double.tryParse((value ?? '0').toString()) ?? 0;
+}
+
+double? _ledgerDoubleOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value.toString());
 }

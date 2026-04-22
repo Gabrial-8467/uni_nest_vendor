@@ -132,7 +132,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                           backgroundColor: Colors.black.withValues(alpha: 0.05),
                           child: Text(
                             '${item.quantity}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black),
                           ),
                         ),
                         const SizedBox(width: 12),

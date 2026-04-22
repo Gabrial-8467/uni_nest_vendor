@@ -1,11 +1,15 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:device_info_plus/device_info_plus.dart';
 
 class AppPermissions {
   /// Request storage permissions based on Android version
   static Future<bool> requestStoragePermission() async {
-    if (Platform.isAndroid) {
+    if (kIsWeb) {
+      return true;
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
       final sdkVersion = await _getAndroidSdkVersion();
 
       if (sdkVersion >= 33) {
@@ -22,29 +26,41 @@ class AppPermissions {
         final status = await ph.Permission.storage.request();
         return status.isGranted;
       }
-    } else if (Platform.isIOS) {
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       final status = await ph.Permission.photos.request();
       return status.isGranted;
     }
 
-    return false;
+    return true;
   }
 
   /// Request camera permission
   static Future<bool> requestCameraPermission() async {
+    if (kIsWeb) {
+      return true;
+    }
+
     final status = await ph.Permission.camera.request();
     return status.isGranted;
   }
 
   /// Request location permission
   static Future<bool> requestLocationPermission() async {
+    if (kIsWeb) {
+      return true;
+    }
+
     final status = await ph.Permission.location.request();
     return status.isGranted;
   }
 
   /// Check if storage permission is granted
   static Future<bool> isStorageGranted() async {
-    if (Platform.isAndroid) {
+    if (kIsWeb) {
+      return true;
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
       final sdkVersion = await _getAndroidSdkVersion();
 
       if (sdkVersion >= 33) {
@@ -54,12 +70,12 @@ class AppPermissions {
         final status = await ph.Permission.storage.status;
         return status.isGranted;
       }
-    } else if (Platform.isIOS) {
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       final status = await ph.Permission.photos.status;
       return status.isGranted;
     }
 
-    return false;
+    return true;
   }
 
   /// Get Android SDK version
@@ -76,6 +92,10 @@ class AppPermissions {
 
   /// Open app settings if permission permanently denied
   static Future<void> openAppSettings() async {
+    if (kIsWeb) {
+      return;
+    }
+
     await ph.openAppSettings();
   }
 }

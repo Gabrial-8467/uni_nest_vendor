@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -10,7 +10,10 @@ class PermissionService {
 
   // Check if running on Android 13+ (API 33+)
   static Future<bool> _isAndroid13OrHigher() async {
-    if (!Platform.isAndroid) return false;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return false;
+    }
+
     final deviceInfo = DeviceInfoPlugin();
     final androidInfo = await deviceInfo.androidInfo;
     return androidInfo.version.sdkInt >= 33;
@@ -18,16 +21,31 @@ class PermissionService {
 
   // Get storage permissions based on Android version
   static Future<List<Permission>> _getStoragePermissions() async {
-    if (await _isAndroid13OrHigher()) {
-      // Android 13+ uses granular media permissions
-      return [Permission.photos, Permission.videos, Permission.audio];
+    if (kIsWeb) {
+      return [];
     }
-    // Android 12 and below uses legacy storage permission
-    return [Permission.storage];
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        if (await _isAndroid13OrHigher()) {
+          // Android 13+ uses granular media permissions
+          return [Permission.photos, Permission.videos, Permission.audio];
+        }
+        // Android 12 and below uses legacy storage permission
+        return [Permission.storage];
+      case TargetPlatform.iOS:
+        return [Permission.photos];
+      default:
+        return [];
+    }
   }
 
   // Required permissions for the app
   static Future<List<Permission>> _getRequiredPermissions() async {
+    if (kIsWeb) {
+      return [];
+    }
+
     final storagePermissions = await _getStoragePermissions();
     return [Permission.camera, ...storagePermissions, Permission.notification];
   }
@@ -54,6 +72,10 @@ class PermissionService {
   static Future<bool> requestRequiredPermissions() async {
     try {
       final requiredPermissions = await _getRequiredPermissions();
+      if (requiredPermissions.isEmpty) {
+        return true;
+      }
+
       final Map<Permission, PermissionStatus> statuses =
           await requiredPermissions.request();
 
@@ -70,6 +92,10 @@ class PermissionService {
   static Future<bool> requestStoragePermission() async {
     try {
       final storagePermissions = await _getStoragePermissions();
+      if (storagePermissions.isEmpty) {
+        return true;
+      }
+
       final Map<Permission, PermissionStatus> statuses =
           await storagePermissions.request();
       return statuses.values.every(
@@ -101,6 +127,10 @@ class PermissionService {
   // Request optional permissions
   static Future<void> requestOptionalPermissions() async {
     try {
+      if (kIsWeb) {
+        return;
+      }
+
       await _optionalPermissions.request();
     } catch (e) {
       debugPrint('Error requesting optional permissions: $e');
@@ -110,6 +140,10 @@ class PermissionService {
   // Request a specific permission
   static Future<bool> requestPermission(Permission permission) async {
     try {
+      if (kIsWeb) {
+        return true;
+      }
+
       final status = await permission.request();
       return status == PermissionStatus.granted;
     } catch (e) {
@@ -121,6 +155,10 @@ class PermissionService {
   // Check permission status
   static Future<bool> isPermissionGranted(Permission permission) async {
     try {
+      if (kIsWeb) {
+        return true;
+      }
+
       final status = await permission.status;
       return status == PermissionStatus.granted;
     } catch (e) {
@@ -294,6 +332,10 @@ class PermissionService {
   // Request specific permission
   static Future<void> _requestSpecificPermission(Permission permission) async {
     try {
+      if (kIsWeb) {
+        return;
+      }
+
       final status = await permission.request();
       if (status != PermissionStatus.granted) {
         debugPrint('Permission denied: ${permission.toString()}');

@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_endpoints.dart';
 import '../config/vendor_config.dart';
-import '../models/vendor_models.dart';
+import '../models/ledger_models.dart';
+import '../models/vendor_models.dart' hide VendorPayout;
 import '../utils/secure_logger.dart';
 import 'image_upload_service.dart';
 import 'secure_auth_service.dart';
@@ -970,13 +971,13 @@ class VendorApiService {
     );
   }
 
-  static Future<VendorLedger> getVendorLedger(String authToken) async {
+  static Future<VendorLedgerSummary> getVendorLedger(String authToken) async {
     final response = await _makeRequest(
       ApiMethods.get,
       ApiEndpoints.ledger,
       authTokenOverride: authToken,
     );
-    return VendorLedger.fromJson(
+    return VendorLedgerSummary.fromJson(
       Map<String, dynamic>.from(response['data'] ?? {}),
     );
   }

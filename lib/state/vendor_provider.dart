@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_endpoints.dart';
 import '../models/vendor_models.dart';
+import '../models/ledger_models.dart' as ledger_models;
 import '../services/vendor_api_service.dart';
 import '../services/secure_auth_service.dart';
 import '../config/vendor_config.dart';
@@ -15,9 +16,9 @@ class VendorProvider extends ChangeNotifier {
   Vendor? _currentVendor;
   List<Product> _products = [];
   List<Order> _orders = [];
-  List<VendorPayout> _payouts = [];
+  List<ledger_models.VendorPayout> _payouts = [];
   VendorAnalytics? _analytics;
-  VendorLedger? _ledger;
+  ledger_models.VendorLedgerSummary? _ledger;
   Map<String, dynamic> _earnings = {};
   Map<String, dynamic> _settings = {};
   DateTime? _productsLastLoadedAt;
@@ -51,9 +52,9 @@ class VendorProvider extends ChangeNotifier {
   Vendor? get currentVendor => _currentVendor;
   List<Product> get products => _products;
   List<Order> get orders => _orders;
-  List<VendorPayout> get payouts => _payouts;
+  List<ledger_models.VendorPayout> get payouts => _payouts;
   VendorAnalytics? get analytics => _analytics;
-  VendorLedger? get ledger => _ledger;
+  ledger_models.VendorLedgerSummary? get ledger => _ledger;
   Map<String, dynamic> get earnings => _earnings;
   Map<String, dynamic> get settings => _settings;
 
@@ -624,7 +625,10 @@ class VendorProvider extends ChangeNotifier {
     _payoutsError = null;
 
     try {
-      _payouts = await VendorApiService.getVendorPayouts(_authToken!);
+      final payoutsResult = await VendorApiService.getVendorPayouts(
+        _authToken!,
+      );
+      _payouts = payoutsResult;
       SecureLogger.info('Loaded ${_payouts.length} payouts', tag: 'PAYOUTS');
     } catch (e) {
       await _handleUnauthorizedIfNeeded(e);
@@ -1020,15 +1024,16 @@ class VendorProvider extends ChangeNotifier {
         0.0;
   }
 
-  double get availableSettlementBalance => _ledger?.availableAmount ?? 0.0;
+  double get availableSettlementBalance => _ledger?.availableBalance ?? 0.0;
 
-  double get pendingSettlementBalance => _ledger?.pendingAmount ?? 0.0;
+  double get pendingSettlementBalance => _ledger?.pendingBalance ?? 0.0;
 
-  double get totalCommissionOwed => _ledger?.totalCommissionOwed ?? 0.0;
+  double get totalCommissionOwed => _ledger?.commissionOwed ?? 0.0;
 
   double get platformReceivable => _ledger?.platformReceivable ?? 0.0;
 
-  VendorPayout? get latestPayout => _payouts.isEmpty ? null : _payouts.first;
+  ledger_models.VendorPayout? get latestPayout =>
+      _payouts.isEmpty ? null : _payouts.first;
 
   // Get today's revenue
   double get todayRevenue {

@@ -40,18 +40,83 @@ class VendorPayoutsTab extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Admin controls transfers. Available balance below is ready for payout according to system settlement rules.',
+                  'Available after cross-settlement between online and COD orders.',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  formatCurrency(ledger?.availableBalance ?? 0),
+                  formatCurrency(ledger?.netAvailableAmount ?? 0),
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     color: AppTheme.success,
                   ),
                 ),
+
+                // Cross-settlement mini breakdown
+                if (ledger != null &&
+                    (ledger.reconciledCodFees != null &&
+                        ledger.reconciledCodFees! > 0))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.sync,
+                                size: 16,
+                                color: Colors.blue[700],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Cross-settlement applied',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (ledger.grossOnlinePayable != null)
+                            _buildMiniRow(
+                              'Online payable',
+                              ledger.grossOnlinePayable!,
+                              Colors.green,
+                            ),
+                          if (ledger.grossCodReceivable != null &&
+                              ledger.grossCodReceivable! > 0)
+                            _buildMiniRow(
+                              'COD fees owed',
+                              -ledger.grossCodReceivable!,
+                              Colors.orange,
+                            ),
+                          const Divider(height: 16),
+                          _buildMiniRow(
+                            'Net after settlement',
+                            ledger.netAvailableAmount,
+                            ledger.netAvailableAmount >= 0
+                                ? Colors.green
+                                : Colors.red,
+                            isBold: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -129,6 +194,38 @@ class VendorPayoutsTab extends ConsumerWidget {
                     ),
                   ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniRow(
+    String label,
+    double amount,
+    Color color, {
+    bool isBold = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          Text(
+            '${amount >= 0 ? '+' : ''}${formatCurrency(amount)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
         ],
