@@ -132,7 +132,10 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                           backgroundColor: Colors.black.withValues(alpha: 0.05),
                           child: Text(
                             '${item.quantity}',
-                            style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -330,29 +333,91 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     WidgetRef ref,
     VendorOrder order,
   ) async {
-    final controller = TextEditingController();
+    final customController = TextEditingController();
+    String? selectedReason;
     final reason = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Reject order'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Reason for rejection'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Reject order'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selectedReason,
+                hint: const Text('Select reason'),
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Reason for rejection',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'Out of stock',
+                    child: Text('Out of stock'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Item damaged/expired',
+                    child: Text('Item damaged/expired'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Shop closed',
+                    child: Text('Shop closed'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Too busy/high load',
+                    child: Text('Too busy/high load'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Customer unreachable',
+                    child: Text('Customer unreachable'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Other',
+                    child: Text('Other (specify below)'),
+                  ),
+                ],
+                onChanged: (value) => setState(() => selectedReason = value),
+              ),
+              if (selectedReason == 'Other') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: customController,
+                  decoration: const InputDecoration(
+                    labelText: 'Custom reason',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selectedReason == null
+                  ? null
+                  : () {
+                      final result = selectedReason == 'Other'
+                          ? customController.text.trim()
+                          : selectedReason;
+                      if (result != null && result.isNotEmpty) {
+                        Navigator.of(dialogContext).pop(result);
+                      }
+                    },
+              child: const Text('Reject'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Reject'),
-          ),
-        ],
       ),
     );
-    controller.dispose();
+
+    // Defer dispose to avoid lifecycle conflict with dialog dismissal
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      customController.dispose();
+    });
 
     if (reason == null || reason.isEmpty) {
       return;

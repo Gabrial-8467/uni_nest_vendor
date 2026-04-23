@@ -268,9 +268,7 @@ class PermissionWrapper extends StatefulWidget {
 }
 
 class _PermissionWrapperState extends State<PermissionWrapper> {
-  bool _permissionsChecked = false;
-  bool _showPermissionDialog = false;
-  bool _hasShownDialogBefore = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -279,14 +277,13 @@ class _PermissionWrapperState extends State<PermissionWrapper> {
   }
 
   Future<void> _checkPermissions() async {
-    final granted = await PermissionService.areRequiredPermissionsGranted;
+    await PermissionService.areRequiredPermissionsGranted;
 
+    // Defer state update to avoid lifecycle conflicts
     if (mounted) {
-      setState(() {
-        _permissionsChecked = true;
-        _showPermissionDialog = !granted && !_hasShownDialogBefore;
-        if (_showPermissionDialog) {
-          _hasShownDialogBefore = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _isLoading = false);
         }
       });
     }
@@ -294,7 +291,7 @@ class _PermissionWrapperState extends State<PermissionWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_permissionsChecked) {
+    if (_isLoading) {
       return const Scaffold(
         backgroundColor: AppTheme.background,
         body: Center(
@@ -305,7 +302,6 @@ class _PermissionWrapperState extends State<PermissionWrapper> {
       );
     }
 
-    // Always return the child widget - no popup dialog
     return widget.child;
   }
 }
