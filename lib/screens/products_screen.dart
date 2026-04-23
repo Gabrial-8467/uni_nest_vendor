@@ -161,8 +161,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     }
   }
 
-  void _showDeleteConfirmDialog(dynamic product) {
-    showDialog(
+  Future<void> _showDeleteConfirmDialog(dynamic product) async {
+    await showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Product'),
@@ -355,80 +355,78 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       child: CircularProgressIndicator(color: AppTheme.primary),
                     )
                   : filteredProducts.isEmpty
-                      ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: [
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.48,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.inventory_2_outlined,
-                                      size: 64,
-                                      color: Colors.grey[400],
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.48,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  vendorProvider.products.isNotEmpty
+                                      ? 'No matching products'
+                                      : 'No products found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  vendorProvider.products.isNotEmpty
+                                      ? 'Try clearing search or selecting All category'
+                                      : 'Pull to refresh or tap + to add your first product',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (vendorProvider.productsError != null) ...[
+                                  const SizedBox(height: 12),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
                                     ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      vendorProvider.products.isNotEmpty
-                                          ? 'No matching products'
-                                          : 'No products found',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      vendorProvider.products.isNotEmpty
-                                          ? 'Try clearing search or selecting All category'
-                                          : 'Pull to refresh or tap + to add your first product',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[500],
+                                    child: Text(
+                                      vendorProvider.productsError!,
+                                      style: const TextStyle(
+                                        color: AppTheme.error,
+                                        fontSize: 12,
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
-                                    if (vendorProvider.productsError != null) ...[
-                                      const SizedBox(height: 12),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 24,
-                                        ),
-                                        child: Text(
-                                          vendorProvider.productsError!,
-                                          style: const TextStyle(
-                                            color: AppTheme.error,
-                                            fontSize: 12,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: filteredProducts.length,
-                          itemBuilder: (context, index) {
-                            return ProductCard(
-                              product: filteredProducts[index],
-                              onEdit: () => _showEditProductDialog(
-                                filteredProducts[index],
-                              ),
-                              onDelete: () => _showDeleteConfirmDialog(
-                                filteredProducts[index],
-                              ),
-                            );
-                          },
+                          ),
                         ),
+                      ],
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        return ProductCard(
+                          product: filteredProducts[index],
+                          onEdit: () =>
+                              _showEditProductDialog(filteredProducts[index]),
+                          onDelete: () =>
+                              _showDeleteConfirmDialog(filteredProducts[index]),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -960,7 +958,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     final navigator = Navigator.of(context);
 
     // Show loading indicator
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const AlertDialog(

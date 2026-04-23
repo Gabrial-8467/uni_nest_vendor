@@ -160,8 +160,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     }
   }
 
-  void _showPermissionDeniedDialog(ImageSource source) {
-    showDialog(
+  Future<void> _showPermissionDeniedDialog(ImageSource source) async {
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Permission Required'),
@@ -188,8 +188,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     );
   }
 
-  void _showImagePicker() {
-    showModalBottomSheet(
+  Future<void> _showImagePicker() async {
+    await showModalBottomSheet(
       context: context,
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),

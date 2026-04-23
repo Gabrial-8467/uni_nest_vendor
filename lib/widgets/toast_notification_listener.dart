@@ -144,15 +144,18 @@ class _ToastNotificationListenerState
   String _orderEventText(VendorNotification notification) {
     final data = notification.data ?? const <String, dynamic>{};
     return [
-      notification.title,
-      notification.body,
-      data['event'],
-      data['action'],
-      data['notificationType'],
-      data['type'],
-    ].whereType<Object>().map((value) {
-      return value.toString().toLowerCase();
-    }).join(' ');
+          notification.title,
+          notification.body,
+          data['event'],
+          data['action'],
+          data['notificationType'],
+          data['type'],
+        ]
+        .whereType<Object>()
+        .map((value) {
+          return value.toString().toLowerCase();
+        })
+        .join(' ');
   }
 
   String _orderStatus(VendorNotification notification) {
@@ -183,43 +186,49 @@ class _ToastNotificationListenerState
     final color = _getNotificationColor(notification.type);
     final icon = _getNotificationIcon(notification.type);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    notification.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  if (notification.body.isNotEmpty)
+    // Schedule SnackBar after current frame to avoid duplicate GlobalKey error
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      notification.body,
-                      style: const TextStyle(fontSize: 12),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      notification.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                ],
+                    if (notification.body.isNotEmpty)
+                      Text(
+                        notification.body,
+                        style: const TextStyle(fontSize: 12),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: color,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
-        backgroundColor: color,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+      );
+    });
   }
 
   IconData _getNotificationIcon(String type) {

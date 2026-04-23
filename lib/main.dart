@@ -115,22 +115,21 @@ class UNINestVendorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: PermissionWrapper(
-        child: MaterialApp(
-          title: VendorConfig.appName,
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          home: const SplashScreen(),
-          routes: {
-            '/auth': (context) => const VendorAuthGateScreen(),
-            '/dashboard': (context) => const VendorShellScreen(),
-            '/signup': (context) => const VendorSignupScreen(),
-            '/forgot-password': (context) => const VendorForgotPasswordScreen(),
-          },
-        ),
-      ),
+    return MaterialApp(
+      title: VendorConfig.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const PermissionWrapper(child: SplashScreen()),
+      routes: {
+        '/auth': (context) =>
+            const PermissionWrapper(child: VendorAuthGateScreen()),
+        '/dashboard': (context) =>
+            const PermissionWrapper(child: VendorShellScreen()),
+        '/signup': (context) =>
+            const PermissionWrapper(child: VendorSignupScreen()),
+        '/forgot-password': (context) =>
+            const PermissionWrapper(child: VendorForgotPasswordScreen()),
+      },
     );
   }
 }

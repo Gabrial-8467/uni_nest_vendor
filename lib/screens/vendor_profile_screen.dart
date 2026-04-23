@@ -608,7 +608,7 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 
-  void _showEditProfileDialog() {
+  Future<void> _showEditProfileDialog() async {
     final authState = ref.read(authProvider);
     final profile = authState.session?.profile;
 
@@ -634,12 +634,13 @@ class _VendorProfileTabState extends ConsumerState<VendorProfileTab>
         profile.businessType?.trim().toLowerCase().isNotEmpty == true
         ? profile.businessType!.trim().toLowerCase()
         : 'restaurant';
-    String selectedBusinessType = businessTypes.containsValue(initialBusinessType)
+    String selectedBusinessType =
+        businessTypes.containsValue(initialBusinessType)
         ? initialBusinessType
         : 'other';
     bool isLoading = false;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(

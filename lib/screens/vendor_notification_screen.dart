@@ -600,12 +600,12 @@ class VendorNotificationScreen extends ConsumerWidget {
   }
 
   /// Show delete confirmation dialog
-  void _showDeleteDialog(
+  Future<void> _showDeleteDialog(
     BuildContext context,
     WidgetRef ref,
     VendorNotification notification,
-  ) {
-    showDialog(
+  ) async {
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Notification'),
@@ -638,8 +638,8 @@ class VendorNotificationScreen extends ConsumerWidget {
   }
 
   /// Show clear all confirmation dialog
-  void _showClearAllDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+  Future<void> _showClearAllDialog(BuildContext context, WidgetRef ref) async {
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear All Notifications'),
