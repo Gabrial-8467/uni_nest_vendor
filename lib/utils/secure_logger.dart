@@ -18,6 +18,21 @@ class SecureLogger {
     'ssn',
     'pin',
     'cvv',
+    // Bank/Payout related
+    'accountnumber',
+    'account_number',
+    'ifsc',
+    'ifscode',
+    'ifsc_code',
+    'upi',
+    'upiid',
+    'upi_id',
+    'bankaccount',
+    'bank_account',
+    'payoutmethod',
+    'payout_method',
+    'accountholder',
+    'account_holder',
   ];
 
   static const List<String> _sensitivePatterns = [
@@ -25,6 +40,12 @@ class SecureLogger {
     r'\b\d{3}-\d{2}-\d{4}\b', // SSN pattern
     r'\b[A-Za-z0-9+/]{20,}={0,2}\b', // Base64 encoded data (potential tokens)
     r'Bearer\s+[A-Za-z0-9\-._~+/]+=*', // Bearer tokens
+    // Bank account patterns (9-18 digits)
+    r'\b\d{9,18}\b',
+    // IFSC code pattern (4 letters + 7 alphanumeric)
+    r'\b[A-Z]{4}[0-9A-Z]{7}\b',
+    // UPI ID pattern
+    r'\b[A-Za-z0-9._-]+@[A-Za-z]{3,}\b',
   ];
 
   static bool get enableDebugLogging => kDebugMode;
@@ -35,7 +56,8 @@ class SecureLogger {
 
     final sanitizedMessage = _sanitizeMessage(message);
     final timestamp = DateTime.now().toIso8601String();
-    final logMessage = '[$timestamp] [$level] ${tag != null ? '[$tag] ' : ''}$sanitizedMessage';
+    final logMessage =
+        '[$timestamp] [$level] ${tag != null ? '[$tag] ' : ''}$sanitizedMessage';
 
     if (error != null) {
       debugPrint('$logMessage\nError: ${_sanitizeError(error)}');
@@ -62,7 +84,11 @@ class SecureLogger {
   }
 
   // Network request logging
-  static void logRequest(String method, String url, {Map<String, dynamic>? body}) {
+  static void logRequest(
+    String method,
+    String url, {
+    Map<String, dynamic>? body,
+  }) {
     if (!enableDebugLogging) return;
 
     final sanitizedUrl = _sanitizeUrl(url);
@@ -103,7 +129,9 @@ class SecureLogger {
       final sanitizedQuery = <String, String>{};
 
       uri.queryParameters.forEach((key, value) {
-        if (_sensitiveKeywords.any((keyword) => key.toLowerCase().contains(keyword))) {
+        if (_sensitiveKeywords.any(
+          (keyword) => key.toLowerCase().contains(keyword),
+        )) {
           sanitizedQuery[key] = '[REDACTED]';
         } else {
           sanitizedQuery[key] = value;
@@ -136,15 +164,24 @@ class SecureLogger {
 
     // Remove sensitive keywords and their values
     for (final keyword in _sensitiveKeywords) {
-      final pattern = RegExp('$keyword\\s*[:=]\\s*[\\w\\-._~+/=]+', caseSensitive: false);
+      final pattern = RegExp(
+        '$keyword\\s*[:=]\\s*[\\w\\-._~+/=]+',
+        caseSensitive: false,
+      );
       sanitized = sanitized.replaceAll(pattern, '$keyword: [REDACTED]');
     }
 
     // Remove email addresses
-    sanitized = sanitized.replaceAll(RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'), '[EMAIL_REDACTED]');
+    sanitized = sanitized.replaceAll(
+      RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
+      '[EMAIL_REDACTED]',
+    );
 
     // Remove phone numbers
-    sanitized = sanitized.replaceAll(RegExp(r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b'), '[PHONE_REDACTED]');
+    sanitized = sanitized.replaceAll(
+      RegExp(r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b'),
+      '[PHONE_REDACTED]',
+    );
 
     return sanitized;
   }
@@ -154,7 +191,9 @@ class SecureLogger {
     final sanitized = <String, dynamic>{};
 
     data.forEach((key, value) {
-      if (_sensitiveKeywords.any((keyword) => key.toLowerCase().contains(keyword))) {
+      if (_sensitiveKeywords.any(
+        (keyword) => key.toLowerCase().contains(keyword),
+      )) {
         sanitized[key] = '[REDACTED]';
       } else if (value is Map<String, dynamic>) {
         sanitized[key] = _sanitizeMap(value);
@@ -210,15 +249,24 @@ class SecureLogger {
   }
 
   // Performance logging
-  static void logPerformance(String operation, Duration duration, {String? tag}) {
+  static void logPerformance(
+    String operation,
+    Duration duration, {
+    String? tag,
+  }) {
     if (!enableDebugLogging) return;
 
-    final message = 'Operation "$operation" completed in ${duration.inMilliseconds}ms';
+    final message =
+        'Operation "$operation" completed in ${duration.inMilliseconds}ms';
     info(message, tag: tag ?? 'PERFORMANCE');
   }
 
   // User action logging
-  static void logUserAction(String action, {Map<String, dynamic>? metadata, String? tag}) {
+  static void logUserAction(
+    String action, {
+    Map<String, dynamic>? metadata,
+    String? tag,
+  }) {
     if (!enableDebugLogging) return;
 
     final message = 'User action: $action';
@@ -231,7 +279,11 @@ class SecureLogger {
   }
 
   // Security event logging
-  static void logSecurityEvent(String event, {Map<String, dynamic>? context, String? tag}) {
+  static void logSecurityEvent(
+    String event, {
+    Map<String, dynamic>? context,
+    String? tag,
+  }) {
     // Security events should always be logged regardless of debug mode
     final message = 'SECURITY: $event';
     if (context != null) {
@@ -243,7 +295,12 @@ class SecureLogger {
   }
 
   // Error logging with stack trace
-  static void logError(String message, {Object? error, StackTrace? stackTrace, String? tag}) {
+  static void logError(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    String? tag,
+  }) {
     if (!enableDebugLogging) return;
 
     final logMessage = _sanitizeMessage(message);
@@ -253,7 +310,9 @@ class SecureLogger {
           '[$tag] ERROR: $logMessage\nError: ${_sanitizeError(error)}\nStack Trace:\n$stackTrace',
         );
       } else {
-        debugPrint('[$tag] ERROR: $logMessage\nError: ${_sanitizeError(error)}');
+        debugPrint(
+          '[$tag] ERROR: $logMessage\nError: ${_sanitizeError(error)}',
+        );
       }
     } else {
       debugPrint('[$tag] ERROR: $logMessage');

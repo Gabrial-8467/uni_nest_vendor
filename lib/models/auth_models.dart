@@ -1,3 +1,65 @@
+class PayoutMethod {
+  PayoutMethod({
+    required this.type,
+    required this.accountHolderName,
+    this.bankName,
+    this.accountNumber,
+    this.ifscCode,
+    this.upiId,
+    this.isVerified = false,
+  });
+
+  final String type; // 'bank_transfer', 'upi'
+  final String accountHolderName;
+  final String? bankName;
+  final String? accountNumber;
+  final String? ifscCode;
+  final String? upiId;
+  final bool isVerified;
+
+  bool get isBankTransfer => type == 'bank_transfer';
+  bool get isUpi => type == 'upi';
+
+  String get maskedAccountNumber {
+    if (accountNumber == null || accountNumber!.length < 4) {
+      return accountNumber ?? '';
+    }
+    final last4 = accountNumber!.substring(accountNumber!.length - 4);
+    return '**** **** $last4';
+  }
+
+  String get displayLabel {
+    if (isUpi && upiId != null) return upiId!;
+    if (bankName != null) return bankName!;
+    return 'Bank Account';
+  }
+
+  factory PayoutMethod.fromJson(Map<String, dynamic> json) {
+    final type = (json['type'] ?? 'bank_transfer').toString();
+    return PayoutMethod(
+      type: type,
+      accountHolderName:
+          (json['accountHolderName'] ?? json['accountHolder'] ?? '').toString(),
+      bankName: json['bankName']?.toString(),
+      accountNumber:
+          json['accountNumber']?.toString() ?? json['account']?.toString(),
+      ifscCode: json['ifscCode']?.toString() ?? json['ifsc']?.toString(),
+      upiId: json['upiId']?.toString() ?? json['upi']?.toString(),
+      isVerified: json['isVerified'] == true || json['verified'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'accountHolderName': accountHolderName,
+    'bankName': bankName,
+    'accountNumber': accountNumber,
+    'ifscCode': ifscCode,
+    'upiId': upiId,
+    'isVerified': isVerified,
+  };
+}
+
 class VendorProfile {
   VendorProfile({
     required this.id,
@@ -9,6 +71,7 @@ class VendorProfile {
     this.avatarUrl,
     this.description,
     this.isOpen = true,
+    this.payoutMethod,
   });
 
   final String id;
@@ -22,6 +85,7 @@ class VendorProfile {
   // Nullable to avoid hot-restart/runtime layout issues when this field is newly
   // introduced (old in-memory instances can surface it as null).
   final bool? isOpen;
+  final PayoutMethod? payoutMethod;
 
   bool get isOpenValue => isOpen ?? true;
 
@@ -69,6 +133,16 @@ class VendorProfile {
           ? null
           : (json['description'] ?? '').toString(),
       isOpen: _toBool(rawOpenStatus, defaultValue: true),
+      payoutMethod: json['payoutMethod'] is Map<String, dynamic>
+          ? PayoutMethod.fromJson(
+              Map<String, dynamic>.from(json['payoutMethod']),
+            )
+          : json['bankDetails'] is Map<String, dynamic>
+          ? PayoutMethod.fromJson({
+              ...Map<String, dynamic>.from(json['bankDetails']),
+              'type': 'bank_transfer',
+            })
+          : null,
     );
   }
 
@@ -112,6 +186,7 @@ class VendorProfile {
     'description': description,
     'isOpen': isOpenValue,
     'isAcceptingOrders': isOpenValue,
+    'payoutMethod': payoutMethod?.toJson(),
   };
 
   VendorProfile copyWith({
@@ -124,6 +199,7 @@ class VendorProfile {
     String? avatarUrl,
     String? description,
     bool? isOpen,
+    PayoutMethod? payoutMethod,
   }) {
     return VendorProfile(
       id: id ?? this.id,
@@ -134,7 +210,8 @@ class VendorProfile {
       businessType: businessType ?? this.businessType,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       description: description ?? this.description,
-      isOpen: isOpen ?? this.isOpenValue,
+      isOpen: isOpen ?? isOpenValue,
+      payoutMethod: payoutMethod ?? this.payoutMethod,
     );
   }
 }

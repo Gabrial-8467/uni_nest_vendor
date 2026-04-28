@@ -280,6 +280,52 @@ class VendorApiClient {
     }
   }
 
+  Future<VendorPayout> requestPayout({required double amount}) async {
+    final response = await _request(
+      method: 'POST',
+      path: '/payouts/request',
+      body: {'amount': amount},
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return VendorPayout.fromJson(Map<String, dynamic>.from(data));
+    }
+    throw VendorApiException('Invalid response format from payout request');
+  }
+
+  /// Get vendor's payout method (bank/UPI details)
+  Future<PayoutMethod?> getPayoutMethod() async {
+    try {
+      final response = await _request(method: 'GET', path: '/payouts/method');
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return PayoutMethod.fromJson(Map<String, dynamic>.from(data));
+      }
+      return null;
+    } on VendorApiException catch (error) {
+      if (error.statusCode == 404) {
+        return null; // No payout method set yet
+      }
+      rethrow;
+    }
+  }
+
+  /// Update vendor's payout method
+  Future<PayoutMethod> updatePayoutMethod(PayoutMethod method) async {
+    final response = await _request(
+      method: 'PUT',
+      path: '/payouts/method',
+      body: method.toJson(),
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return PayoutMethod.fromJson(Map<String, dynamic>.from(data));
+    }
+    throw VendorApiException(
+      'Invalid response format from update payout method',
+    );
+  }
+
   Future<Map<String, dynamic>> getAnalytics({
     String period = 'lifetime',
   }) async {

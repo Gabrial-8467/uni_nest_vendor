@@ -6,6 +6,7 @@ import '../core/vendor_formatters.dart';
 import '../providers/ledger_provider.dart';
 import '../providers/payout_provider.dart';
 import '../widgets/empty_state.dart';
+import 'payout_request_screen.dart';
 
 class VendorPayoutsTab extends ConsumerWidget {
   const VendorPayoutsTab({super.key});
@@ -121,15 +122,16 @@ class VendorPayoutsTab extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Payout requests are admin-controlled on the current backend.',
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: (ledger?.netAvailableAmount ?? 0) > 0
+                        ? () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const PayoutRequestScreen(),
+                              ),
+                            );
+                          }
+                        : null,
                     icon: const Icon(Icons.payments_outlined),
                     label: const Text('Request payout'),
                   ),

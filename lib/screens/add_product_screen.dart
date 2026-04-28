@@ -23,7 +23,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  final _stockController = TextEditingController();
   final _discountController = TextEditingController();
 
   String _selectedCategory = 'Snacks';
@@ -63,7 +62,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
-    _stockController.dispose();
     _discountController.dispose();
     super.dispose();
   }
@@ -260,7 +258,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     });
 
     try {
-      final stockQuantity = int.tryParse(_stockController.text.trim()) ?? 0;
       final normalizedCategory = _toApiCategory(_selectedCategory);
 
       // Prepare product data with proper types
@@ -276,8 +273,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'description': _descriptionController.text.trim(),
         'price': price,
         'category': normalizedCategory,
-        'stock': stockQuantity,
-        'availability': stockQuantity > 0 ? 'in_stock' : 'out_of_stock',
         'isFeatured': _isFeatured,
         ...?discountPercentage != null
             ? {'discountPercentage': discountPercentage}
@@ -449,21 +444,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                   setState(() {
                     _selectedCategory = value!;
                   });
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _stockController,
-                label: 'Stock Quantity (Optional)',
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    final stock = int.tryParse(value);
-                    if (stock == null || stock < 0) {
-                      return 'Please enter a valid stock quantity';
-                    }
-                  }
-                  return null;
                 },
               ),
               const SizedBox(height: 24),
