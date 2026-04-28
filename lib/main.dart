@@ -42,6 +42,7 @@ import 'services/auth_service.dart';
 import 'services/cache_service.dart';
 import 'services/permission_service.dart';
 import 'services/update_service.dart';
+import 'services/vendor_push_notification_service.dart';
 import 'utils/app_theme.dart';
 import 'utils/connectivity_service.dart';
 import 'utils/logger.dart';
@@ -107,6 +108,12 @@ Future<void> _initializeServices() async {
     await PermissionService.initializePermissions();
   } catch (e) {
     debugPrint('Permission service initialization failed: $e');
+  }
+
+  try {
+    await VendorPushNotificationService.initialize();
+  } catch (e) {
+    debugPrint('Push notification initialization failed: $e');
   }
 }
 

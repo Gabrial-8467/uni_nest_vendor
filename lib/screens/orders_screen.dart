@@ -51,17 +51,19 @@ class _VendorOrdersTabState extends ConsumerState<VendorOrdersTab>
     final filtered = _filter(orderState.orders);
     final newCount = filtered
         .where(
-          (order) => order.status == 'pending' || order.status == 'confirmed',
+          (order) =>
+              order.status.toLowerCase() == 'pending' ||
+              order.status.toLowerCase() == 'confirmed',
         )
         .length;
     final preparingCount = filtered
-        .where((order) => order.status == 'preparing')
+        .where((order) => order.status.toLowerCase() == 'preparing')
         .length;
     final readyCount = filtered
-        .where((order) => order.status == 'ready')
+        .where((order) => order.status.toLowerCase() == 'ready')
         .length;
     final deliveryCount = filtered
-        .where((order) => order.status == 'out_for_delivery')
+        .where((order) => order.status.toLowerCase() == 'delivered')
         .length;
 
     return Scaffold(
@@ -258,8 +260,7 @@ class _OrderListView extends ConsumerWidget {
     final orderState = ref.watch(orderProvider);
 
     return RefreshIndicator(
-      onRefresh: () =>
-          ref.read(orderProvider.notifier).loadOrders(force: true),
+      onRefresh: () => ref.read(orderProvider.notifier).loadOrders(force: true),
       child: orders.isEmpty
           ? ListView(
               children: [
@@ -274,7 +275,8 @@ class _OrderListView extends ConsumerWidget {
                     title: orderState.errorMessage == null
                         ? 'No orders here'
                         : 'Could not load orders',
-                    message: orderState.errorMessage ??
+                    message:
+                        orderState.errorMessage ??
                         'Orders for this stage will appear once they are moved into this queue.',
                   ),
               ],

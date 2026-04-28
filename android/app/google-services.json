@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "936084751914",
+    "project_id": "uninest-backend",
+    "storage_bucket": "uninest-backend.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:936084751914:android:c6470175f2c5b81d7aa553",
+        "android_client_info": {
+          "package_name": "com.example.uni_nest_vendor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAalWscQ83QVwMCnVT4A304i7Y0SkpBago"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:936084751914:android:50392224d8fbbadf7aa553",
+        "android_client_info": {
+          "package_name": "com.example.uninest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAalWscQ83QVwMCnVT4A304i7Y0SkpBago"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

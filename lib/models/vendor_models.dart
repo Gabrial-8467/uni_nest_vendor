@@ -61,6 +61,7 @@ class Vendor {
   final String? profileImage;
   final Map<String, dynamic> businessDetails;
   final NotificationSettings notificationSettings;
+  final bool isOpen;
 
   Vendor({
     required this.id,
@@ -77,6 +78,7 @@ class Vendor {
     this.profileImage,
     required this.businessDetails,
     required this.notificationSettings,
+    this.isOpen = true,
   });
 
   static double _toDouble(dynamic value) {
@@ -104,6 +106,20 @@ class Vendor {
         ? _toDouble(rawRating['average'])
         : _toDouble(rawRating);
     final status = (json['status'] ?? '').toString().toLowerCase();
+    final businessDetails = json['businessDetails'] is Map
+        ? Map<String, dynamic>.from(json['businessDetails'])
+        : <String, dynamic>{};
+    final rawOpenStatus =
+        json['isOpen'] ??
+        json['isAvailable'] ??
+        json['isAcceptingOrders'] ??
+        json['acceptingOrders'] ??
+        json['canteenOpen'] ??
+        businessDetails['isOpen'] ??
+        businessDetails['isAvailable'] ??
+        businessDetails['isAcceptingOrders'] ??
+        businessDetails['acceptingOrders'] ??
+        businessDetails['canteenOpen'];
 
     return Vendor(
       id: (json['id'] ?? json['_id'] ?? user['_id'] ?? '').toString(),
@@ -122,11 +138,41 @@ class Vendor {
       isActive: json['isActive'] == true || status == 'active',
       createdAt: _parseDate(json['createdAt']),
       profileImage: (json['profileImage'] ?? user['avatar'])?.toString(),
-      businessDetails: json['businessDetails'] ?? {},
+      businessDetails: businessDetails,
       notificationSettings: NotificationSettings.fromJson(
         json['notificationSettings'] ?? {},
       ),
+      isOpen: _toBool(rawOpenStatus, defaultValue: true),
     );
+  }
+
+  static bool _toBool(dynamic value, {required bool defaultValue}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if ([
+        'true',
+        '1',
+        'yes',
+        'open',
+        'available',
+        'active',
+      ].contains(normalized)) {
+        return true;
+      }
+      if ([
+        'false',
+        '0',
+        'no',
+        'closed',
+        'unavailable',
+        'inactive',
+      ].contains(normalized)) {
+        return false;
+      }
+    }
+    return defaultValue;
   }
 
   Map<String, dynamic> toJson() {
@@ -145,6 +191,8 @@ class Vendor {
       'profileImage': profileImage,
       'businessDetails': businessDetails,
       'notificationSettings': notificationSettings.toJson(),
+      'isOpen': isOpen,
+      'isAcceptingOrders': isOpen,
     };
   }
 
@@ -162,6 +210,7 @@ class Vendor {
     String? profileImage,
     Map<String, dynamic>? businessDetails,
     NotificationSettings? notificationSettings,
+    bool? isOpen,
   }) {
     return Vendor(
       id: id ?? this.id,
@@ -177,6 +226,7 @@ class Vendor {
       profileImage: profileImage ?? this.profileImage,
       businessDetails: businessDetails ?? this.businessDetails,
       notificationSettings: notificationSettings ?? this.notificationSettings,
+      isOpen: isOpen ?? this.isOpen,
     );
   }
 }

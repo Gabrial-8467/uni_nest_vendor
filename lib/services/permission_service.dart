@@ -107,6 +107,38 @@ class PermissionService {
     }
   }
 
+  // Request notification permission only (for push notifications)
+  static Future<bool> requestNotificationPermission() async {
+    try {
+      if (kIsWeb) {
+        return true;
+      }
+
+      final status = await Permission.notification.request();
+      return status == PermissionStatus.granted ||
+          status == PermissionStatus.provisional;
+    } catch (e) {
+      debugPrint('Error requesting notification permission: $e');
+      return false;
+    }
+  }
+
+  // Check if notification permission is granted
+  static Future<bool> isNotificationGranted() async {
+    try {
+      if (kIsWeb) {
+        return true;
+      }
+
+      final status = await Permission.notification.status;
+      return status == PermissionStatus.granted ||
+          status == PermissionStatus.provisional;
+    } catch (e) {
+      debugPrint('Error checking notification permission: $e');
+      return false;
+    }
+  }
+
   // Check if storage permission is granted
   static Future<bool> isStorageGranted() async {
     try {

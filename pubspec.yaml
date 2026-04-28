@@ -60,6 +60,8 @@ dependencies:
   geocoding: ^4.0.0
   
   # Local Notifications
+  firebase_core: ^4.2.1
+  firebase_messaging: ^16.0.4
   flutter_local_notifications: ^21.0.0
   workmanager: ^0.9.0+3
   

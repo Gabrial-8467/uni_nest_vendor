@@ -378,6 +378,8 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
                 // Quick Stats
                 QuickStatsWidget(vendorProvider: vendorProvider),
                 const SizedBox(height: 16),
+                _buildCanteenStatusToggle(vendorProvider),
+                const SizedBox(height: 16),
 
                 // Revenue Chart
                 RevenueChartWidget(vendorProvider: vendorProvider),
@@ -440,6 +442,110 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildCanteenStatusToggle(VendorProvider vendorProvider) {
+    final vendor = vendorProvider.currentVendor;
+    final isOpen = vendor?.isOpen ?? true;
+    final isUpdating = vendorProvider.isUpdatingCanteenStatus;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isOpen
+              ? Colors.green.withValues(alpha: 0.35)
+              : Colors.redAccent.withValues(alpha: 0.35),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: (isOpen ? Colors.green : Colors.redAccent).withValues(
+                alpha: 0.12,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isOpen ? Icons.storefront : Icons.storefront_outlined,
+              color: isOpen ? Colors.green : Colors.redAccent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isOpen ? 'Canteen Open' : 'Canteen Closed',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF2D3436),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isOpen
+                      ? 'Customers can place orders from this canteen.'
+                      : 'Ordering is paused across the app ecosystem.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (isUpdating)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Switch.adaptive(
+              value: isOpen,
+              activeThumbColor: Colors.green,
+              onChanged: vendor == null
+                  ? null
+                  : (value) => _updateCanteenStatus(vendorProvider, value),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateCanteenStatus(
+    VendorProvider vendorProvider,
+    bool isOpen,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final success = await vendorProvider.updateCanteenOpenStatus(isOpen);
+    if (!mounted) {
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Canteen is now ${isOpen ? 'open' : 'closed'}'
+              : 'Failed to update canteen status',
+        ),
+        backgroundColor: success ? Colors.green : Colors.redAccent,
       ),
     );
   }

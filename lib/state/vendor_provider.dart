@@ -33,6 +33,7 @@ class VendorProvider extends ChangeNotifier {
   bool _isLoadingEarnings = false;
   bool _isLoadingLedger = false;
   bool _isLoadingPayouts = false;
+  bool _isUpdatingCanteenStatus = false;
 
   // Error States
   String? _error;
@@ -65,6 +66,7 @@ class VendorProvider extends ChangeNotifier {
   bool get isLoadingEarnings => _isLoadingEarnings;
   bool get isLoadingLedger => _isLoadingLedger;
   bool get isLoadingPayouts => _isLoadingPayouts;
+  bool get isUpdatingCanteenStatus => _isUpdatingCanteenStatus;
 
   String? get error => _error;
   String? get productsError => _productsError;
@@ -691,6 +693,62 @@ class VendorProvider extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<bool> updateCanteenOpenStatus(bool isOpen) async {
+    if (!_isAuthenticated || _authToken == null || _currentVendor == null) {
+      return false;
+    }
+
+    _isUpdatingCanteenStatus = true;
+    _error = null;
+
+    final previousVendor = _currentVendor!;
+    final businessDetails = Map<String, dynamic>.from(
+      previousVendor.businessDetails,
+    );
+    businessDetails['isOpen'] = isOpen;
+    businessDetails['isAvailable'] = isOpen;
+    businessDetails['isAcceptingOrders'] = isOpen;
+    businessDetails['acceptingOrders'] = isOpen;
+    businessDetails['canteenOpen'] = isOpen;
+
+    _currentVendor = previousVendor.copyWith(
+      isOpen: isOpen,
+      businessDetails: businessDetails,
+    );
+    notifyListeners();
+
+    try {
+      final updatedVendor = await VendorApiService.updateVendorProfile(
+        {
+          'isOpen': isOpen,
+          'isAvailable': isOpen,
+          'isAcceptingOrders': isOpen,
+          'acceptingOrders': isOpen,
+          'canteenOpen': isOpen,
+          'businessDetails': businessDetails,
+        },
+        _authToken!,
+      );
+
+      _currentVendor = updatedVendor.copyWith(isOpen: isOpen);
+      await _saveAuthState();
+
+      SecureLogger.info(
+        'Canteen status updated: ${isOpen ? 'open' : 'closed'}',
+        tag: 'PROFILE',
+      );
+      return true;
+    } catch (e) {
+      _currentVendor = previousVendor;
+      _error = 'Failed to update canteen status: ${e.toString()}';
+      SecureLogger.error('Failed to update canteen status', error: e);
+      return false;
+    } finally {
+      _isUpdatingCanteenStatus = false;
+      notifyListeners();
     }
   }
 

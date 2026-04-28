@@ -280,6 +280,17 @@ class VendorApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> getAnalytics({
+    String period = 'lifetime',
+  }) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/analytics',
+      queryParameters: {'period': period},
+    );
+    return _asMap(response['data']);
+  }
+
   Future<List<VendorNotification>> getNotifications() async {
     final response = await _request(
       method: 'GET',
@@ -305,20 +316,6 @@ class VendorApiClient {
   /// Get vendor dashboard data
   Future<Map<String, dynamic>> getDashboard() async {
     final response = await _request(method: 'GET', path: '/dashboard');
-    final data = response['data'];
-    if (data is Map<String, dynamic>) {
-      return Map<String, dynamic>.from(data);
-    }
-    return <String, dynamic>{};
-  }
-
-  /// Get vendor analytics
-  Future<Map<String, dynamic>> getAnalytics({String? period}) async {
-    final response = await _request(
-      method: 'GET',
-      path: '/analytics',
-      queryParameters: period != null ? {'period': period} : null,
-    );
     final data = response['data'];
     if (data is Map<String, dynamic>) {
       return Map<String, dynamic>.from(data);

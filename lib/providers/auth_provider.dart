@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/vendor_api_client.dart';
 import '../models/auth_models.dart';
+import '../services/vendor_push_notification_service.dart';
 
 final secureStorageProvider = Provider<FlutterSecureStorage>(
   (ref) => const FlutterSecureStorage(),
@@ -104,6 +107,9 @@ class AuthController extends Notifier<AuthState> {
               didBootstrap: true,
               clearError: true,
             );
+            unawaited(
+              VendorPushNotificationService.registerCurrentToken(),
+            );
           } catch (e) {
             // Widget was disposed, ignore state update
           }
@@ -117,6 +123,9 @@ class AuthController extends Notifier<AuthState> {
               session: hydrated,
               didBootstrap: true,
               clearError: true,
+            );
+            unawaited(
+              VendorPushNotificationService.registerCurrentToken(),
             );
           } catch (e) {
             // Widget was disposed, ignore state update
@@ -161,6 +170,7 @@ class AuthController extends Notifier<AuthState> {
         session: hydrated,
         didBootstrap: true,
       );
+      unawaited(VendorPushNotificationService.registerCurrentToken());
       return true;
     } catch (error) {
       state = state.copyWith(
@@ -207,6 +217,7 @@ class AuthController extends Notifier<AuthState> {
         session: hydrated,
         didBootstrap: true,
       );
+      unawaited(VendorPushNotificationService.registerCurrentToken());
       return true;
     } catch (error) {
       state = state.copyWith(
@@ -231,6 +242,7 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    await VendorPushNotificationService.unregisterCurrentToken();
     await _apiClient.clearSession();
     state = const AuthState(didBootstrap: true);
   }
@@ -301,6 +313,59 @@ class AuthController extends Notifier<AuthState> {
       } catch (e) {
         // Widget was disposed, ignore state update
       }
+      return false;
+    }
+  }
+
+  Future<bool> updateCanteenOpenStatus(bool isOpen) async {
+    final session = state.session;
+    if (session == null) {
+      return false;
+    }
+
+    final businessDetails = {
+      'isOpen': isOpen,
+      'isAvailable': isOpen,
+      'isAcceptingOrders': isOpen,
+      'acceptingOrders': isOpen,
+      'canteenOpen': isOpen,
+    };
+
+    try {
+      state = state.copyWith(isLoading: true, clearError: true);
+    } catch (_) {}
+
+    try {
+      final updatedProfile = await _apiClient.updateProfile({
+        'isOpen': isOpen,
+        'isAvailable': isOpen,
+        'isAcceptingOrders': isOpen,
+        'acceptingOrders': isOpen,
+        'canteenOpen': isOpen,
+        'businessDetails': businessDetails,
+      });
+
+      final hydrated = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        profile: updatedProfile.copyWith(isOpen: isOpen),
+      );
+      await _apiClient.persistSession(hydrated);
+      try {
+        state = state.copyWith(
+          isLoading: false,
+          session: hydrated,
+          clearError: true,
+        );
+      } catch (_) {}
+      return true;
+    } catch (error) {
+      try {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: error.toString(),
+        );
+      } catch (_) {}
       return false;
     }
   }

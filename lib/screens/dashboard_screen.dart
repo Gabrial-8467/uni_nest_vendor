@@ -29,6 +29,7 @@ class VendorDashboardTab extends ConsumerWidget {
     final cancelledCount = ref.watch(cancelledOrdersProvider).length;
     final ledger = ledgerState.ledger;
     final authState = ref.watch(authProvider);
+    final profile = authState.session?.profile;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -42,10 +43,18 @@ class VendorDashboardTab extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _DashboardHero(
-            businessName: authState.session?.profile.businessName ?? 'Vendor',
+            businessName: profile?.businessName ?? 'Vendor',
             activeOrders: activeOrders.length,
             deliveredOrders: deliveredCount,
             cancelledOrders: cancelledCount,
+          ),
+          const SizedBox(height: 16),
+          _CanteenStatusSwitch(
+            isOpen: profile?.isOpenValue ?? true,
+            isUpdating: authState.isLoading,
+            onChanged: profile == null
+                ? null
+                : (value) => _updateCanteenStatus(context, ref, value),
           ),
           const SizedBox(height: 16),
           _SectionBox(
@@ -179,6 +188,93 @@ class VendorDashboardTab extends ConsumerWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateCanteenStatus(
+    BuildContext context,
+    WidgetRef ref,
+    bool isOpen,
+  ) async {
+    final success = await ref
+        .read(authProvider.notifier)
+        .updateCanteenOpenStatus(isOpen);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Canteen is now ${isOpen ? 'open' : 'closed'}'
+              : 'Failed to update canteen status',
+        ),
+        backgroundColor: success ? Colors.green : Colors.redAccent,
+      ),
+    );
+  }
+}
+
+class _CanteenStatusSwitch extends StatelessWidget {
+  const _CanteenStatusSwitch({
+    required this.isOpen,
+    required this.isUpdating,
+    required this.onChanged,
+  });
+
+  final bool isOpen;
+  final bool isUpdating;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionBox(
+      title: isOpen ? 'Canteen Open' : 'Canteen Closed',
+      subtitle: isOpen
+          ? 'Customers can place orders from this canteen.'
+          : 'Ordering is paused across the app ecosystem.',
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: (isOpen ? Colors.green : Colors.redAccent).withValues(
+                alpha: 0.12,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isOpen ? Icons.storefront : Icons.storefront_outlined,
+              color: isOpen ? Colors.green : Colors.redAccent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              isOpen
+                  ? 'Visible as open to customers and admin.'
+                  : 'Visible as closed to customers and admin.',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (isUpdating)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Switch.adaptive(
+              value: isOpen,
+              activeThumbColor: Colors.green,
+              onChanged: onChanged,
+            ),
         ],
       ),
     );

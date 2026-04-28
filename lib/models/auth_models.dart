@@ -8,6 +8,7 @@ class VendorProfile {
     this.businessType,
     this.avatarUrl,
     this.description,
+    this.isOpen = true,
   });
 
   final String id;
@@ -18,6 +19,11 @@ class VendorProfile {
   final String? businessType;
   final String? avatarUrl;
   final String? description;
+  // Nullable to avoid hot-restart/runtime layout issues when this field is newly
+  // introduced (old in-memory instances can surface it as null).
+  final bool? isOpen;
+
+  bool get isOpenValue => isOpen ?? true;
 
   factory VendorProfile.fromJson(Map<String, dynamic> json) {
     final user = json['user'] is Map<String, dynamic>
@@ -26,6 +32,20 @@ class VendorProfile {
     final contactInfo = json['contactInfo'] is Map<String, dynamic>
         ? json['contactInfo'] as Map<String, dynamic>
         : <String, dynamic>{};
+    final businessDetails = json['businessDetails'] is Map<String, dynamic>
+        ? json['businessDetails'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final rawOpenStatus =
+        json['isOpen'] ??
+        json['isAvailable'] ??
+        json['isAcceptingOrders'] ??
+        json['acceptingOrders'] ??
+        json['canteenOpen'] ??
+        businessDetails['isOpen'] ??
+        businessDetails['isAvailable'] ??
+        businessDetails['isAcceptingOrders'] ??
+        businessDetails['acceptingOrders'] ??
+        businessDetails['canteenOpen'];
     return VendorProfile(
       id: (json['_id'] ?? json['id'] ?? user['_id'] ?? '').toString(),
       name: (json['name'] ?? user['name'] ?? '').toString(),
@@ -48,7 +68,37 @@ class VendorProfile {
       description: (json['description'] ?? '').toString().trim().isEmpty
           ? null
           : (json['description'] ?? '').toString(),
+      isOpen: _toBool(rawOpenStatus, defaultValue: true),
     );
+  }
+
+  static bool _toBool(dynamic value, {required bool defaultValue}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if ([
+        'true',
+        '1',
+        'yes',
+        'open',
+        'available',
+        'active',
+      ].contains(normalized)) {
+        return true;
+      }
+      if ([
+        'false',
+        '0',
+        'no',
+        'closed',
+        'unavailable',
+        'inactive',
+      ].contains(normalized)) {
+        return false;
+      }
+    }
+    return defaultValue;
   }
 
   Map<String, dynamic> toJson() => {
@@ -60,7 +110,33 @@ class VendorProfile {
     'businessType': businessType,
     'avatarUrl': avatarUrl,
     'description': description,
+    'isOpen': isOpenValue,
+    'isAcceptingOrders': isOpenValue,
   };
+
+  VendorProfile copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? businessName,
+    String? phone,
+    String? businessType,
+    String? avatarUrl,
+    String? description,
+    bool? isOpen,
+  }) {
+    return VendorProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      businessName: businessName ?? this.businessName,
+      phone: phone ?? this.phone,
+      businessType: businessType ?? this.businessType,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      description: description ?? this.description,
+      isOpen: isOpen ?? this.isOpenValue,
+    );
+  }
 }
 
 class AuthSession {
