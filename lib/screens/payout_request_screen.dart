@@ -66,6 +66,13 @@ class _PayoutRequestScreenState extends ConsumerState<PayoutRequestScreen> {
     final maxAmount = ledger?.netAvailableAmount ?? 0;
     final payoutMethod = payoutMethodState.method;
 
+    // Debug logging
+    debugPrint('=== PAYOUT DEBUG ===');
+    debugPrint('maxAmount: $maxAmount');
+    debugPrint('payoutMethod: $payoutMethod');
+    debugPrint('isVerified: ${payoutMethod?.isVerified}');
+    debugPrint('===================');
+
     return SecureScreen(
       child: Scaffold(
         backgroundColor: AppTheme.background,
@@ -74,6 +81,26 @@ class _PayoutRequestScreenState extends ConsumerState<PayoutRequestScreen> {
           backgroundColor: AppTheme.surface,
           foregroundColor: AppTheme.textPrimary,
           elevation: 0,
+          actions: [
+            IconButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                await ref
+                    .read(payoutMethodProvider.notifier)
+                    .loadPayoutMethod();
+                await ref.read(ledgerProvider.notifier).loadLedger();
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Refreshed'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
         ),
         body: _showConfirmation
             ? _buildConfirmationView(payoutState, payoutMethod)
@@ -251,32 +278,61 @@ class _PayoutRequestScreenState extends ConsumerState<PayoutRequestScreen> {
                   ),
                 ],
               ),
-              if (method.isVerified)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified, color: Colors.green, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        'Verified',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (method.isVerified)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                    ],
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, color: Colors.green, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'Verified',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  // Edit Button
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              AddPayoutMethodScreen(existingMethod: method),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.edit_outlined,
+                        color: AppTheme.primary,
+                        size: 18,
+                      ),
+                    ),
                   ),
-                ),
+                ],
+              ),
             ],
           ),
           const Divider(height: 24),
@@ -429,19 +485,42 @@ class _PayoutRequestScreenState extends ConsumerState<PayoutRequestScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed:
-                    maxAmount > 0 &&
-                        payoutMethod != null &&
-                        payoutMethod.isVerified
-                    ? _proceedToConfirmation
-                    : null,
+                onPressed: () {
+                  if (payoutMethod == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Please add a payout method (UPI or Bank Account) first',
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  } else if (!payoutMethod.isVerified) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Your payout method is pending verification. Please wait for admin approval.',
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  } else if (maxAmount <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('No balance available for withdrawal'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  } else {
+                    _proceedToConfirmation();
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  disabledBackgroundColor: Colors.grey.shade300,
                 ),
                 child: Text(
                   payoutMethod == null
@@ -648,6 +727,30 @@ class _PayoutRequestScreenState extends ConsumerState<PayoutRequestScreen> {
               ],
             ),
           ),
+
+          // Error Message
+          if (payoutState.requestErrorMessage != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      payoutState.requestErrorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // Bottom Actions
           const SizedBox(height: 16),

@@ -8,7 +8,9 @@ import '../utils/payout_security.dart';
 import '../utils/secure_logger.dart';
 
 class AddPayoutMethodScreen extends ConsumerStatefulWidget {
-  const AddPayoutMethodScreen({super.key});
+  const AddPayoutMethodScreen({super.key, this.existingMethod});
+
+  final PayoutMethod? existingMethod;
 
   @override
   ConsumerState<AddPayoutMethodScreen> createState() =>
@@ -27,6 +29,28 @@ class _AddPayoutMethodScreenState extends ConsumerState<AddPayoutMethodScreen> {
 
   // UPI fields
   final _upiIdController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFields();
+  }
+
+  void _initializeFields() {
+    final method = widget.existingMethod;
+    if (method == null) return;
+
+    _selectedType = method.type;
+    _accountHolderController.text = method.accountHolderName;
+
+    if (method.isUpi) {
+      _upiIdController.text = method.upiId ?? '';
+    } else {
+      _bankNameController.text = method.bankName ?? '';
+      _accountNumberController.text = method.accountNumber ?? '';
+      _ifscCodeController.text = method.ifscCode ?? '';
+    }
+  }
 
   @override
   void dispose() {
