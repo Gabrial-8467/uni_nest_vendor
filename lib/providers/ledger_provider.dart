@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ledger_models.dart';
@@ -27,36 +29,48 @@ class LedgerState {
 class LedgerController extends Notifier<LedgerState> {
   @override
   LedgerState build() {
+    // Auto-load ledger when provider is first created
+    Future.microtask(() => loadLedger());
     return const LedgerState();
   }
 
-  bool _isFetching = false;
-
   Future<void> loadLedger({bool silent = false}) async {
+    debugPrint('[LEDGER_PROVIDER] loadLedger() called');
+
     if (!ref.read(authProvider).isAuthenticated) {
-      state = const LedgerState();
+      debugPrint('[LEDGER_PROVIDER] Not authenticated');
       return;
     }
 
-    if (_isFetching) {
+    // Prevent concurrent fetches by checking isLoading
+    if (state.isLoading) {
+      debugPrint('[LEDGER_PROVIDER] Already loading, skipping');
       return;
     }
-    _isFetching = true;
 
     if (!silent) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
     try {
-      final ledger = await ref.read(vendorApiClientProvider).getLedger();
+      debugPrint('[LEDGER_PROVIDER] Calling API...');
+      final ledger = await ref
+          .read(vendorApiClientProvider)
+          .getLedger()
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception('Request timed out after 15 seconds');
+            },
+          );
+      debugPrint('[LEDGER_PROVIDER] API success');
       state = state.copyWith(
         isLoading: false,
         ledger: ledger,
         clearError: true,
       );
     } catch (error) {
+      debugPrint('[LEDGER_PROVIDER] API error: $error');
       state = state.copyWith(isLoading: false, errorMessage: error.toString());
-    } finally {
-      _isFetching = false;
     }
   }
 }
