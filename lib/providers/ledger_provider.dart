@@ -1,7 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../models/ledger_models.dart';
 import 'auth_provider.dart';
 
@@ -35,16 +32,12 @@ class LedgerController extends Notifier<LedgerState> {
   }
 
   Future<void> loadLedger({bool silent = false}) async {
-    debugPrint('[LEDGER_PROVIDER] loadLedger() called');
-
     if (!ref.read(authProvider).isAuthenticated) {
-      debugPrint('[LEDGER_PROVIDER] Not authenticated');
       return;
     }
 
     // Prevent concurrent fetches by checking isLoading
     if (state.isLoading) {
-      debugPrint('[LEDGER_PROVIDER] Already loading, skipping');
       return;
     }
 
@@ -52,7 +45,6 @@ class LedgerController extends Notifier<LedgerState> {
       state = state.copyWith(isLoading: true, clearError: true);
     }
     try {
-      debugPrint('[LEDGER_PROVIDER] Calling API...');
       final ledger = await ref
           .read(vendorApiClientProvider)
           .getLedger()
@@ -62,14 +54,12 @@ class LedgerController extends Notifier<LedgerState> {
               throw Exception('Request timed out after 15 seconds');
             },
           );
-      debugPrint('[LEDGER_PROVIDER] API success');
       state = state.copyWith(
         isLoading: false,
         ledger: ledger,
         clearError: true,
       );
     } catch (error) {
-      debugPrint('[LEDGER_PROVIDER] API error: $error');
       state = state.copyWith(isLoading: false, errorMessage: error.toString());
     }
   }

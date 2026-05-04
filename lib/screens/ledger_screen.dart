@@ -14,16 +14,6 @@ class VendorLedgerTab extends ConsumerWidget {
     final ledgerState = ref.watch(ledgerProvider);
     final ledger = ledgerState.ledger;
 
-    // Debug logging
-    debugPrint('=== LEDGER DEBUG ===');
-    debugPrint('ledger: $ledger');
-    debugPrint('entries count: ${ledger?.entries.length ?? 0}');
-    debugPrint('grossOnlinePayable: ${ledger?.grossOnlinePayable}');
-    debugPrint('grossCodReceivable: ${ledger?.grossCodReceivable}');
-    debugPrint('reconciledCodFees: ${ledger?.reconciledCodFees}');
-    debugPrint('netAvailableAmount: ${ledger?.netAvailableAmount}');
-    debugPrint('===================');
-
     return RefreshIndicator(
       onRefresh: () => ref.read(ledgerProvider.notifier).loadLedger(),
       child: ListView(
