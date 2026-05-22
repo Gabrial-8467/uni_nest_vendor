@@ -27,6 +27,9 @@ class ApiEndpoints {
 
   // Analytics Endpoints
   static const String analytics = '/analytics';
+  static const String productAnalytics = '/analytics/products';
+  static const String revenueAnalytics = '/analytics/revenue';
+  static const String orderAnalytics = '/analytics/orders';
 
   // Reviews Endpoints
   static const String reviews = '/reviews';
@@ -34,9 +37,7 @@ class ApiEndpoints {
       '/reviews/products/$productId';
 
   // Upload Endpoints
-  static const String uploadAvatar = '/upload/avatar';
   static const String uploadProductImages = '/upload/product-images';
-  static const String uploadDocuments = '/upload/documents';
 
   // Notification Endpoints
   static const String notifications = '/notifications';

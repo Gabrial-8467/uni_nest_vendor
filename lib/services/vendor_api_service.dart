@@ -367,33 +367,6 @@ class VendorApiService {
     return Vendor.fromJson(response['data']);
   }
 
-  static Future<Map<String, dynamic>> uploadVendorImage(
-    File imageFile,
-    String authToken,
-  ) async {
-    try {
-      final result = await ImageUploadService.uploadSingleImage(
-        imageFile,
-        authToken: authToken,
-        baseUrl: _apiClient._baseUrl,
-        endpoint: ApiEndpoints.uploadAvatar,
-      );
-
-      if (result.success) {
-        return {
-          'success': true,
-          'data': {'url': result.imageUrl},
-          'message': 'Image uploaded successfully',
-        };
-      } else {
-        return {'success': false, 'message': result.error ?? 'Upload failed'};
-      }
-    } catch (e) {
-      SecureLogger.error('Vendor image upload failed', error: e);
-      return {'success': false, 'message': 'Upload error: $e'};
-    }
-  }
-
   static Future<List<Product>> getVendorProducts(
     String authToken, {
     String? status,
@@ -1244,34 +1217,6 @@ class VendorApiService {
 
   // ==================== UPLOAD ENDPOINTS ====================
 
-  /// Upload vendor avatar
-  static Future<Map<String, dynamic>> uploadAvatar(
-    File imageFile,
-    String authToken,
-  ) async {
-    try {
-      final result = await ImageUploadService.uploadSingleImage(
-        imageFile,
-        authToken: authToken,
-        baseUrl: _apiClient._baseUrl,
-        endpoint: ApiEndpoints.uploadAvatar,
-      );
-
-      if (result.success) {
-        return {
-          'success': true,
-          'urls': [result.imageUrl],
-          'message': 'Avatar uploaded successfully',
-        };
-      } else {
-        return {'success': false, 'message': result.error ?? 'Upload failed'};
-      }
-    } catch (e) {
-      SecureLogger.error('Avatar upload failed', error: e);
-      return {'success': false, 'message': 'Upload error: $e'};
-    }
-  }
-
   /// Upload product images (general endpoint)
   static Future<Map<String, dynamic>> uploadProductImagesGeneral(
     List<File> imageFiles,
@@ -1308,42 +1253,6 @@ class VendorApiService {
       };
     } catch (e) {
       SecureLogger.error('Product images upload failed', error: e);
-      return {'success': false, 'message': 'Upload error: $e'};
-    }
-  }
-
-  /// Upload vendor documents
-  static Future<Map<String, dynamic>> uploadDocuments(
-    List<File> documentFiles,
-    String authToken,
-  ) async {
-    try {
-      final results = await ImageUploadService.uploadImages(
-        documentFiles,
-        authToken: authToken,
-        baseUrl: _apiClient._baseUrl,
-        endpoint: ApiEndpoints.uploadDocuments,
-      );
-
-      final successfulUploads = results.where((r) => r.success).toList();
-      final failedUploads = results.where((r) => !r.success).toList();
-
-      if (successfulUploads.isEmpty) {
-        return {
-          'success': false,
-          'message': 'All uploads failed',
-          'errors': failedUploads.map((r) => r.error).toList(),
-        };
-      }
-
-      return {
-        'success': true,
-        'urls': successfulUploads.map((r) => r.imageUrl).toList(),
-        'message':
-            '${successfulUploads.length} documents uploaded successfully',
-      };
-    } catch (e) {
-      SecureLogger.error('Document upload failed', error: e);
       return {'success': false, 'message': 'Upload error: $e'};
     }
   }

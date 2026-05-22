@@ -93,8 +93,11 @@ class VendorApiClient {
   }
 
   Future<void> forgotPassword({required String email}) async {
-    throw VendorApiException(
-      'Forgot password is not available in the current vendor API.',
+    await _request(
+      method: 'POST',
+      path: '/auth/forgot-password',
+      requiresAuth: false,
+      body: {'email': email},
     );
   }
 
@@ -225,6 +228,13 @@ class VendorApiClient {
     required String orderId,
     required String reason,
   }) async {
+    final order = await getOrderById(orderId);
+    final status = order.status.toLowerCase();
+    if (status != 'pending' && status != 'confirmed') {
+      throw VendorApiException(
+        'Cannot reject order in "$status" status. Only pending or confirmed orders can be rejected.',
+      );
+    }
     return updateOrderStatus(
       orderId: orderId,
       status: 'cancelled',
@@ -236,12 +246,18 @@ class VendorApiClient {
     required String orderId,
     required String otp,
   }) async {
-    return updateOrderStatus(
-      orderId: orderId,
-      status: 'delivered',
-      note: 'Delivery OTP verified by vendor',
-      otp: otp,
+    final response = await _request(
+      method: 'POST',
+      path: '/orders/$orderId/verify-otp',
+      body: {'otp': otp},
     );
+    final payload = response['data'];
+    final orderJson = payload is Map<String, dynamic>
+        ? payload['order'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(payload['order'] as Map)
+              : payload
+        : <String, dynamic>{};
+    return VendorOrder.fromJson(orderJson);
   }
 
   Future<VendorLedgerSummary> getLedger() async {
@@ -337,6 +353,37 @@ class VendorApiClient {
     return _asMap(response['data']);
   }
 
+  Future<Map<String, dynamic>> getProductAnalytics({
+    String period = '7d',
+  }) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/analytics/products',
+      queryParameters: {'period': period},
+    );
+    return _asMap(response['data']);
+  }
+
+  Future<Map<String, dynamic>> getRevenueAnalytics({
+    String period = '7d',
+  }) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/analytics/revenue',
+      queryParameters: {'period': period},
+    );
+    return _asMap(response['data']);
+  }
+
+  Future<Map<String, dynamic>> getOrderAnalytics({String period = '7d'}) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/analytics/orders',
+      queryParameters: {'period': period},
+    );
+    return _asMap(response['data']);
+  }
+
   Future<List<VendorNotification>> getNotifications() async {
     final response = await _request(
       method: 'GET',
@@ -369,14 +416,255 @@ class VendorApiClient {
     return <String, dynamic>{};
   }
 
+  // ==================== PRODUCT CRUD ====================
+
+  Future<List<Map<String, dynamic>>> getProducts({
+    int page = 1,
+    int limit = 50,
+    String? search,
+    String? category,
+    String? status,
+    String? availability,
+    bool? isFeatured,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    if (category != null && category.isNotEmpty) {
+      queryParams['category'] = category;
+    }
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+    if (availability != null && availability.isNotEmpty) {
+      queryParams['availability'] = availability;
+    }
+    if (isFeatured != null) queryParams['isFeatured'] = isFeatured.toString();
+    if (sortBy != null && sortBy.isNotEmpty) queryParams['sortBy'] = sortBy;
+    if (sortOrder != null && sortOrder.isNotEmpty) {
+      queryParams['sortOrder'] = sortOrder;
+    }
+
+    final response = await _request(
+      method: 'GET',
+      path: '/products',
+      queryParameters: queryParams,
+    );
+    final data = response['data'];
+    final rawProducts = data is List
+        ? data
+        : data is Map<String, dynamic>
+        ? (data['products'] ?? data['items'] ?? data['results'] ?? const [])
+        : const [];
+
+    return (rawProducts as List)
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> getProductById(String productId) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/products/$productId',
+    );
+    final payload = response['data'];
+    if (payload is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(payload);
+    }
+    return <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> createProduct({
+    required String name,
+    required String description,
+    required double price,
+    required String category,
+    String? availability,
+    bool? isFeatured,
+    List<String>? images,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'description': description,
+      'price': price,
+      'category': category,
+    };
+    if (availability != null) body['availability'] = availability;
+    if (isFeatured != null) body['isFeatured'] = isFeatured;
+    if (images != null && images.isNotEmpty) body['images'] = images;
+
+    final response = await _request(
+      method: 'POST',
+      path: '/products',
+      body: body,
+    );
+    final payload = response['data'];
+    if (payload is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(payload);
+    }
+    return <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> updateProduct({
+    required String productId,
+    String? name,
+    String? description,
+    double? price,
+    String? category,
+    String? availability,
+    bool? isFeatured,
+    List<String>? images,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
+    if (price != null) body['price'] = price;
+    if (category != null) body['category'] = category;
+    if (availability != null) body['availability'] = availability;
+    if (isFeatured != null) body['isFeatured'] = isFeatured;
+    if (images != null) body['images'] = images;
+
+    final response = await _request(
+      method: 'PUT',
+      path: '/products/$productId',
+      body: body.isEmpty ? null : body,
+    );
+    final payload = response['data'];
+    if (payload is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(payload);
+    }
+    return <String, dynamic>{};
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    await _request(method: 'DELETE', path: '/products/$productId');
+  }
+
+  // ==================== UPLOAD ====================
+
+  Future<List<String>> uploadProductImages(
+    List<List<int>> imageBytesList,
+    List<String> filenames,
+  ) async {
+    final uri = _buildUri('/upload/product-images');
+    final token = await getAccessToken();
+    final request = http.MultipartRequest('POST', uri);
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    for (var i = 0; i < imageBytesList.length; i++) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'images',
+          imageBytesList[i],
+          filename: filenames[i],
+        ),
+      );
+    }
+    final streamedResponse = await request.send().timeout(
+      VendorConfig.connectionTimeout,
+    );
+    final response = await http.Response.fromStream(streamedResponse);
+    final decoded = _decodeResponse(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        final urls = data['imageUrls'] ?? data['urls'] ?? data['images'];
+        if (urls is List) {
+          return urls.whereType<String>().toList();
+        }
+      }
+      return [];
+    }
+    throw VendorApiException(
+      decoded['message']?.toString() ??
+          decoded['error']?.toString() ??
+          'Upload failed',
+      statusCode: response.statusCode,
+    );
+  }
+
+  // ==================== REVIEWS ====================
+
+  Future<List<Map<String, dynamic>>> getReviews({
+    int page = 1,
+    int limit = 20,
+    int? rating,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (rating != null) queryParams['rating'] = rating.toString();
+
+    final response = await _request(
+      method: 'GET',
+      path: '/reviews',
+      queryParameters: queryParams,
+    );
+    final data = response['data'];
+    final rawReviews = data is List
+        ? data
+        : data is Map<String, dynamic>
+        ? (data['reviews'] ?? data['items'] ?? data['results'] ?? const [])
+        : const [];
+
+    return (rawReviews as List)
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductReviews(
+    String productId, {
+    int page = 1,
+    int limit = 20,
+    int? rating,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (rating != null) queryParams['rating'] = rating.toString();
+
+    final response = await _request(
+      method: 'GET',
+      path: '/reviews/products/$productId',
+      queryParameters: queryParams,
+    );
+    final data = response['data'];
+    final rawReviews = data is List
+        ? data
+        : data is Map<String, dynamic>
+        ? (data['reviews'] ?? data['items'] ?? data['results'] ?? const [])
+        : const [];
+
+    return (rawReviews as List)
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  // ==================== PAYOUT BY ID ====================
+
+  Future<Map<String, dynamic>> getPayoutById(String payoutId) async {
+    final response = await _request(method: 'GET', path: '/payouts/$payoutId');
+    final payload = response['data'];
+    if (payload is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(payload);
+    }
+    return <String, dynamic>{};
+  }
+
   Future<void> markAllNotificationsRead() async {
     await _request(method: 'PUT', path: '/notifications/mark-all-read');
   }
 
   Future<void> markNotificationRead(String notificationId) async {
-    // Backend does not have individual notification read endpoint
-    // Only mark-all-read is available, so we call that instead
-    await markAllNotificationsRead();
+    await _request(method: 'PUT', path: '/notifications/$notificationId/read');
   }
 
   Future<void> clearAllNotifications() async {
@@ -523,6 +811,14 @@ class VendorApiClient {
       return Map<String, dynamic>.from(value);
     }
     return <String, dynamic>{};
+  }
+
+  Uri _buildUri(String path) {
+    final normalizedBase = _baseUrl.endsWith('/')
+        ? _baseUrl.substring(0, _baseUrl.length - 1)
+        : _baseUrl;
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$normalizedBase$normalizedPath');
   }
 
   void _invalidateMutableCaches() {

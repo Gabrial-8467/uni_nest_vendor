@@ -200,18 +200,14 @@ class VendorConfig {
   static const String languageKey = 'vendor_language';
   static const String settingsKey = 'vendor_settings';
 
-  // Product Categories
+  // Product Categories — must match backend enum exactly
   static const List<String> productCategories = [
-    'Snacks',
-    'Beverages',
-    'South Indian',
-    'North Indian',
-    'Chinese',
-    'Continental',
-    'Desserts',
-    'Bakery',
-    'Healthy Food',
-    'Fast Food',
+    'snacks',
+    'beverages',
+    'south indian',
+    'north indian',
+    'chinese',
+    'desserts',
   ];
 
   // Order Status Options
