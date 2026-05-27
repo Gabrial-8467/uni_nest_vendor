@@ -493,9 +493,9 @@ class VendorApiService {
 
     try {
       final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 45),
         onTimeout: () {
-          throw TimeoutException('Product creation timed out after 30 seconds');
+          throw TimeoutException('Product creation timed out after 45 seconds');
         },
       );
 
@@ -607,7 +607,12 @@ class VendorApiService {
       );
 
       try {
-        final streamedResponse = await request.send();
+        final streamedResponse = await request.send().timeout(
+          const Duration(seconds: 45),
+          onTimeout: () {
+            throw TimeoutException('Product update timed out after 45 seconds');
+          },
+        );
         final response = await http.Response.fromStream(streamedResponse);
 
         // DEBUG: Print response details

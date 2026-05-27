@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -117,26 +118,25 @@ class ImageUploadService {
     return compressed ?? imageBytes;
   }
 
-  /// Upload multiple images to Cloudinary via backend
+  /// Upload multiple images to Cloudinary via backend (parallel)
   static Future<List<ImageUploadResult>> uploadImages(
     List<File> imageFiles, {
     required String authToken,
     required String baseUrl,
     String endpoint = '/api/upload/images',
   }) async {
-    final results = <ImageUploadResult>[];
+    final uploads = imageFiles
+        .map(
+          (imageFile) => uploadSingleImage(
+            imageFile,
+            authToken: authToken,
+            baseUrl: baseUrl,
+            endpoint: endpoint,
+          ),
+        )
+        .toList();
 
-    for (final imageFile in imageFiles) {
-      final result = await uploadSingleImage(
-        imageFile,
-        authToken: authToken,
-        baseUrl: baseUrl,
-        endpoint: endpoint,
-      );
-      results.add(result);
-    }
-
-    return results;
+    return await Future.wait(uploads);
   }
 
   /// Upload a single optimized image
@@ -159,24 +159,22 @@ class ImageUploadService {
       final fileName = path.basename(optimizedFile.path);
       SecureLogger.info('Uploading to URL: $uri');
 
-      http.Response? response;
-      const fieldNames = ['images', 'images[]', 'image', 'file'];
-      for (final fieldName in fieldNames) {
-        response = await _sendMultipartUpload(
-          uri: uri,
-          authToken: authToken,
-          imageBytes: imageBytes,
-          fileName: fileName,
-          fileFieldName: fieldName,
-        );
+      final response =
+          await _sendMultipartUpload(
+            uri: uri,
+            authToken: authToken,
+            imageBytes: imageBytes,
+            fileName: fileName,
+            fileFieldName: 'images',
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () =>
+                throw TimeoutException('Image upload timed out after 30s'),
+          );
 
-        SecureLogger.info(
-          'Upload response status ($fieldName): ${response.statusCode}',
-        );
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          break;
-        }
-      }
+      SecureLogger.info(
+        'Upload response status (images): ${response.statusCode}',
+      );
 
       // Clean up temp file if it was created
       if (optimizedFile.path != imageFile.path) {
@@ -187,9 +185,7 @@ class ImageUploadService {
         }
       }
 
-      if (response != null &&
-          response.statusCode >= 200 &&
-          response.statusCode < 300) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = _decodeResponse(response.body);
 
         if (responseData['success'] == true) {
@@ -212,7 +208,7 @@ class ImageUploadService {
         }
       } else {
         return ImageUploadResult.failure(
-          'HTTP ${response?.statusCode ?? 500}: ${response?.reasonPhrase ?? 'Upload failed'}',
+          'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Upload failed'}',
         );
       }
     } catch (e) {

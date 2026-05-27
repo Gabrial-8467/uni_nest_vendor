@@ -6,6 +6,9 @@ String formatCurrency(num value) => NumberFormat.currency(
   decimalDigits: 2,
 ).format(value);
 
+String formatCompactCurrency(num value) =>
+    NumberFormat.compactCurrency(locale: 'en_IN', symbol: 'Rs ').format(value);
+
 String formatCompactDate(DateTime dateTime) =>
     DateFormat('dd MMM, hh:mm a').format(dateTime.toLocal());
 

@@ -238,6 +238,7 @@ class Product {
   final String description;
   final double price;
   final String category;
+  final String foodType;
   final List<String> images;
   final bool isAvailable;
   final int stockQuantity;
@@ -246,7 +247,6 @@ class Product {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final double? discountPercentage;
-  final bool isFeatured;
 
   Product({
     required this.id,
@@ -255,6 +255,7 @@ class Product {
     required this.description,
     required this.price,
     required this.category,
+    this.foodType = 'veg',
     required this.images,
     required this.isAvailable,
     required this.stockQuantity,
@@ -263,7 +264,6 @@ class Product {
     required this.createdAt,
     this.updatedAt,
     this.discountPercentage,
-    this.isFeatured = false,
   });
 
   static double _toDouble(dynamic value) {
@@ -340,10 +340,7 @@ class Product {
         json['media'];
 
     if (rawImages is List) {
-      return rawImages
-          .map(_extractImageString)
-          .whereType<String>()
-          .toList();
+      return rawImages.map(_extractImageString).whereType<String>().toList();
     }
 
     if (rawImages is Map) {
@@ -379,12 +376,11 @@ class Product {
     final stockQuantity = _toInt(
       json['stockQuantity'] ?? json['inStock'] ?? json['stock'],
     );
-    final isAvailable =
-        json.containsKey('isAvailable')
-            ? _toBool(json['isAvailable'], defaultValue: true)
-            : availability.isNotEmpty
-            ? availability == 'in_stock'
-            : stockQuantity > 0;
+    final isAvailable = json.containsKey('isAvailable')
+        ? _toBool(json['isAvailable'], defaultValue: true)
+        : availability.isNotEmpty
+        ? availability == 'in_stock'
+        : stockQuantity > 0;
 
     return Product(
       id: _readString(json['id'] ?? json['_id']),
@@ -393,6 +389,9 @@ class Product {
       description: _readString(json['description']),
       price: _toDouble(json['price']),
       category: _readString(json['category']),
+      foodType: _readString(json['foodType']).isEmpty
+          ? 'veg'
+          : _readString(json['foodType']),
       images: _extractImages(json),
       isAvailable: isAvailable,
       stockQuantity: stockQuantity,
@@ -409,7 +408,6 @@ class Product {
       discountPercentage: json['discountPercentage'] != null
           ? _toDouble(json['discountPercentage'])
           : null,
-      isFeatured: json['isFeatured'] ?? false,
     );
   }
 
@@ -421,6 +419,7 @@ class Product {
       'description': description,
       'price': price,
       'category': category,
+      'foodType': foodType,
       'images': images,
       'isAvailable': isAvailable,
       'stockQuantity': stockQuantity,
@@ -431,7 +430,6 @@ class Product {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'discountPercentage': discountPercentage,
-      'isFeatured': isFeatured,
     };
   }
 
@@ -449,6 +447,7 @@ class Product {
     String? description,
     double? price,
     String? category,
+    String? foodType,
     List<String>? images,
     bool? isAvailable,
     int? stockQuantity,
@@ -457,7 +456,6 @@ class Product {
     DateTime? createdAt,
     DateTime? updatedAt,
     double? discountPercentage,
-    bool? isFeatured,
   }) {
     return Product(
       id: id ?? this.id,
@@ -466,6 +464,7 @@ class Product {
       description: description ?? this.description,
       price: price ?? this.price,
       category: category ?? this.category,
+      foodType: foodType ?? this.foodType,
       images: images ?? this.images,
       isAvailable: isAvailable ?? this.isAvailable,
       stockQuantity: stockQuantity ?? this.stockQuantity,
@@ -474,7 +473,6 @@ class Product {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       discountPercentage: discountPercentage ?? this.discountPercentage,
-      isFeatured: isFeatured ?? this.isFeatured,
     );
   }
 }
@@ -568,7 +566,9 @@ class Order {
       items:
           (json['items'] as List<dynamic>?)
               ?.whereType<Map>()
-              .map((item) => OrderItem.fromJson(Map<String, dynamic>.from(item)))
+              .map(
+                (item) => OrderItem.fromJson(Map<String, dynamic>.from(item)),
+              )
               .toList() ??
           [],
       totalAmount: _toDouble(json['totalAmount'] ?? json['subtotal']),
@@ -585,9 +585,10 @@ class Order {
       paymentMethod: _readString(
         json['paymentMethod'] ?? json['payment']?['method'],
       ),
-      paymentStatus: _readString(
-        json['paymentStatus'] ?? json['payment']?['status'],
-      ).isEmpty
+      paymentStatus:
+          _readString(
+            json['paymentStatus'] ?? json['payment']?['status'],
+          ).isEmpty
           ? 'pending'
           : _readString(json['paymentStatus'] ?? json['payment']?['status']),
       deliveryAddress: deliveryAddress,
@@ -671,8 +672,7 @@ class OrderItem {
       productName:
           (json['productName'] ?? json['name'] ?? product['name'] ?? '')
               .toString(),
-      productImage:
-          (json['productImage'] ?? productImage).toString(),
+      productImage: (json['productImage'] ?? productImage).toString(),
       quantity: json['quantity'] is num ? (json['quantity'] as num).toInt() : 0,
       unitPrice: Order._toDouble(
         json['unitPrice'] ?? json['price'] ?? json['linePrice'],
@@ -770,9 +770,8 @@ class VendorPayout {
       status: (json['status'] ?? 'initiated').toString(),
       bankReference: json['bankReference']?.toString(),
       failureReason: json['failureReason']?.toString(),
-      createdAt: DateTime.tryParse(
-            json['createdAt']?.toString() ?? '',
-          ) ??
+      createdAt:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       completedAt: json['completedAt'] != null
           ? DateTime.tryParse(json['completedAt'].toString())

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 
@@ -354,15 +355,27 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
 
   String _lastLoadedPeriod = '';
 
-  Future<void> _loadOverview(String targetPeriod) async {
+  Future<void> _loadOverview(
+    String targetPeriod, {
+    bool skipCache = false,
+  }) async {
+    debugPrint('[Analytics] Loading overview for period: $targetPeriod');
     try {
       final client = _ref.read(vendorApiClientProvider);
-      final data = await client.getAnalytics(period: targetPeriod);
+      final data = await client.getAnalytics(
+        period: targetPeriod,
+        skipCache: skipCache,
+      );
+      debugPrint('[Analytics] Overview raw response: $data');
       state = state.copyWith(
         isLoading: false,
         data: VendorAnalyticsData.fromJson(data),
       );
+      debugPrint(
+        '[Analytics] Overview loaded: orders=${state.data?.totalOrders}, revenue=${state.data?.totalRevenue}',
+      );
     } catch (e) {
+      debugPrint('[Analytics] Overview error: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Overview failed: ${_shortError(e)}',
@@ -370,15 +383,24 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
     }
   }
 
-  Future<void> _loadProducts(String targetPeriod) async {
+  Future<void> _loadProducts(
+    String targetPeriod, {
+    bool skipCache = false,
+  }) async {
+    debugPrint('[Analytics] Loading products for period: $targetPeriod');
     try {
       final client = _ref.read(vendorApiClientProvider);
-      final data = await client.getProductAnalytics(period: targetPeriod);
+      final data = await client.getProductAnalytics(
+        period: targetPeriod,
+        skipCache: skipCache,
+      );
+      debugPrint('[Analytics] Products raw response: $data');
       state = state.copyWith(
         isLoading: false,
         productData: ProductAnalyticsData.fromJson(data),
       );
     } catch (e) {
+      debugPrint('[Analytics] Products error: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Products failed: ${_shortError(e)}',
@@ -386,15 +408,24 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
     }
   }
 
-  Future<void> _loadRevenue(String targetPeriod) async {
+  Future<void> _loadRevenue(
+    String targetPeriod, {
+    bool skipCache = false,
+  }) async {
+    debugPrint('[Analytics] Loading revenue for period: $targetPeriod');
     try {
       final client = _ref.read(vendorApiClientProvider);
-      final data = await client.getRevenueAnalytics(period: targetPeriod);
+      final data = await client.getRevenueAnalytics(
+        period: targetPeriod,
+        skipCache: skipCache,
+      );
+      debugPrint('[Analytics] Revenue raw response: $data');
       state = state.copyWith(
         isLoading: false,
         revenueData: RevenueAnalyticsData.fromJson(data),
       );
     } catch (e) {
+      debugPrint('[Analytics] Revenue error: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Revenue failed: ${_shortError(e)}',
@@ -402,15 +433,24 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
     }
   }
 
-  Future<void> _loadOrders(String targetPeriod) async {
+  Future<void> _loadOrders(
+    String targetPeriod, {
+    bool skipCache = false,
+  }) async {
+    debugPrint('[Analytics] Loading orders for period: $targetPeriod');
     try {
       final client = _ref.read(vendorApiClientProvider);
-      final data = await client.getOrderAnalytics(period: targetPeriod);
+      final data = await client.getOrderAnalytics(
+        period: targetPeriod,
+        skipCache: skipCache,
+      );
+      debugPrint('[Analytics] Orders raw response: $data');
       state = state.copyWith(
         isLoading: false,
         orderData: OrderAnalyticsData.fromJson(data),
       );
     } catch (e) {
+      debugPrint('[Analytics] Orders error: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Orders failed: ${_shortError(e)}',
@@ -430,41 +470,47 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
     return msg.length > 60 ? '${msg.substring(0, 60)}...' : msg;
   }
 
-  Future<void> _loadForTab(String tab, String targetPeriod) async {
+  Future<void> _loadForTab(
+    String tab,
+    String targetPeriod, {
+    bool skipCache = false,
+  }) async {
     if (_isFetching) return;
     _isFetching = true;
     state = state.copyWith(isLoading: true, clearError: true);
 
-    switch (tab) {
-      case AnalyticsTab.overview:
-        await _loadOverview(targetPeriod);
-        break;
-      case AnalyticsTab.products:
-        await _loadProducts(targetPeriod);
-        break;
-      case AnalyticsTab.revenue:
-        await _loadRevenue(targetPeriod);
-        break;
-      case AnalyticsTab.orders:
-        await _loadOrders(targetPeriod);
-        break;
+    try {
+      switch (tab) {
+        case AnalyticsTab.overview:
+          await _loadOverview(targetPeriod, skipCache: skipCache);
+          break;
+        case AnalyticsTab.products:
+          await _loadProducts(targetPeriod, skipCache: skipCache);
+          break;
+        case AnalyticsTab.revenue:
+          await _loadRevenue(targetPeriod, skipCache: skipCache);
+          break;
+        case AnalyticsTab.orders:
+          await _loadOrders(targetPeriod, skipCache: skipCache);
+          break;
+      }
+      _lastLoadedPeriod = targetPeriod;
+    } finally {
+      _isFetching = false;
     }
-
-    _lastLoadedPeriod = targetPeriod;
-    _isFetching = false;
   }
 
-  void loadInitial() {
+  Future<void> loadInitial() async {
     final targetPeriod = state.period;
     if (_lastLoadedPeriod != targetPeriod || state.data == null) {
-      _loadForTab(AnalyticsTab.overview, targetPeriod);
+      await _loadForTab(AnalyticsTab.overview, targetPeriod);
     }
   }
 
   void setPeriod(String period) {
     if (state.period != period) {
       state = state.copyWith(period: period);
-      _loadForTab(state.activeTab, period);
+      _loadForTab(state.activeTab, period, skipCache: true);
     }
   }
 
@@ -490,7 +536,27 @@ class AnalyticsController extends StateNotifier<AnalyticsState> {
   }
 
   void refreshCurrentTab() {
-    _loadForTab(state.activeTab, state.period);
+    _loadForTab(state.activeTab, state.period, skipCache: true);
+  }
+
+  /// Load data for a specific tab without changing the active tab.
+  /// Used by Overview dropdown to preload chart data.
+  Future<void> preloadTabData(String tab) async {
+    final targetPeriod = state.period;
+    final needsLoad = switch (tab) {
+      AnalyticsTab.overview =>
+        state.data == null || _lastLoadedPeriod != targetPeriod,
+      AnalyticsTab.products =>
+        state.productData == null || _lastLoadedPeriod != targetPeriod,
+      AnalyticsTab.revenue =>
+        state.revenueData == null || _lastLoadedPeriod != targetPeriod,
+      AnalyticsTab.orders =>
+        state.orderData == null || _lastLoadedPeriod != targetPeriod,
+      _ => true,
+    };
+    if (needsLoad) {
+      await _loadForTab(tab, targetPeriod);
+    }
   }
 }
 

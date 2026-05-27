@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/vendor_formatters.dart';
 import '../providers/analytics_provider.dart';
 import '../utils/app_theme.dart';
+import '../widgets/analytics_charts.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key, this.showPageHeader = true});
@@ -32,8 +33,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(analyticsProvider.notifier).loadInitial();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(analyticsProvider.notifier).loadInitial();
     });
   }
 
@@ -239,9 +240,29 @@ class _PeriodSelector extends StatelessWidget {
   }
 }
 
-class _OverviewTab extends ConsumerWidget {
+enum _ChartType {
+  orderStatus('Order Status', AnalyticsTab.overview),
+  topProducts('Top Products', AnalyticsTab.overview),
+  revenueTrend('Revenue Trend', AnalyticsTab.revenue),
+  dailyOrders('Daily Orders', AnalyticsTab.orders),
+  categoryBreakdown('Category Breakdown', AnalyticsTab.products);
+
+  final String label;
+  final String dataTab;
+
+  const _ChartType(this.label, this.dataTab);
+}
+
+class _OverviewTab extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends ConsumerState<_OverviewTab> {
+  _ChartType _selectedChart = _ChartType.orderStatus;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(analyticsProvider);
     final data = state.data;
 
@@ -259,16 +280,196 @@ class _OverviewTab extends ConsumerWidget {
       onRefresh: () async =>
           ref.read(analyticsProvider.notifier).refreshCurrentTab(),
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
           if (state.errorMessage != null)
             _ErrorBanner(message: state.errorMessage!),
-          _SummaryGrid(data: data),
-          const SizedBox(height: 20),
-          _OrderStatusSection(data: data),
-          const SizedBox(height: 20),
-          _TopProductsSection(products: data.topProducts),
-          const SizedBox(height: 20),
+          if (data.totalOrders == 0)
+            _EmptyStateCard(
+              message:
+                  'No orders found in this period.\nTry selecting a different time range.',
+            )
+          else ...[
+            _SummaryGrid(data: data),
+            const SizedBox(height: 20),
+            _ChartSelectorCard(
+              selected: _selectedChart,
+              onChanged: (chart) {
+                setState(() => _selectedChart = chart);
+                if (chart.dataTab != AnalyticsTab.overview) {
+                  ref
+                      .read(analyticsProvider.notifier)
+                      .preloadTabData(chart.dataTab);
+                }
+              },
+            ),
+            const SizedBox(height: 20),
+            _buildChartForSelection(state, data),
+            const SizedBox(height: 20),
+            _OrderStatusSection(data: data),
+            const SizedBox(height: 20),
+            _TopProductsSection(products: data.topProducts),
+            const SizedBox(height: 20),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartForSelection(
+    AnalyticsState state,
+    VendorAnalyticsData data,
+  ) {
+    switch (_selectedChart) {
+      case _ChartType.orderStatus:
+        return _Card(
+          title: 'Order Status',
+          child: OrderStatusDonutChart(
+            delivered: data.deliveredOrders,
+            pending: data.pendingOrders,
+            cancelled: data.cancelledOrders,
+          ),
+        );
+      case _ChartType.topProducts:
+        return _Card(
+          title: 'Top Products by Revenue',
+          child: TopProductsBarChart(products: data.topProducts),
+        );
+      case _ChartType.revenueTrend:
+        final trend = state.revenueData?.trend ?? [];
+        if (state.isLoading && state.revenueData == null) {
+          return const _Card(
+            title: 'Revenue Trend',
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        return _Card(
+          title: 'Revenue Trend',
+          trailing: _Badge(text: '${trend.length} points'),
+          child: RevenueLineChart(trend: trend),
+        );
+      case _ChartType.dailyOrders:
+        final dailyTrend = state.orderData?.dailyTrend ?? [];
+        if (state.isLoading && state.orderData == null) {
+          return const _Card(
+            title: 'Daily Orders',
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        return _Card(
+          title: 'Daily Orders',
+          child: DailyOrdersBarChart(dailyTrend: dailyTrend),
+        );
+      case _ChartType.categoryBreakdown:
+        final categories = state.productData?.categoryBreakdown ?? [];
+        if (state.isLoading && state.productData == null) {
+          return const _Card(
+            title: 'Category Breakdown',
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        return _Card(
+          title: 'Category Breakdown',
+          child: CategoryPieChart(categories: categories),
+        );
+    }
+  }
+}
+
+class _ChartSelectorCard extends StatelessWidget {
+  final _ChartType selected;
+  final ValueChanged<_ChartType> onChanged;
+
+  const _ChartSelectorCard({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.textSecondary.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.insert_chart_outlined,
+            size: 18,
+            color: AppTheme.textSecondary.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<_ChartType>(
+                value: selected,
+                isExpanded: true,
+                icon: Icon(
+                  Icons.keyboard_arrow_down,
+                  color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                ),
+                dropdownColor: AppTheme.surface,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+                selectedItemBuilder: (context) {
+                  return _ChartType.values.map((type) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        type.label,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    );
+                  }).toList();
+                },
+                items: _ChartType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(
+                      type.label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: selected == type
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: selected == type
+                            ? AppTheme.primary
+                            : AppTheme.textPrimary,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) onChanged(value);
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -687,56 +888,12 @@ class _ProductsTab extends ConsumerWidget {
           const SizedBox(height: 20),
           _Card(
             title: 'Category Breakdown',
-            child: data.categoryBreakdown.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text(
-                        'No category data',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: data.categoryBreakdown.map((cat) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                cat.category,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              'Qty: ${cat.totalQuantity}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              formatCurrency(cat.totalRevenue),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            child: CategoryPieChart(categories: data.categoryBreakdown),
+          ),
+          const SizedBox(height: 20),
+          _Card(
+            title: 'Top Products by Revenue',
+            child: TopProductsBarChart(products: data.topProducts),
           ),
           const SizedBox(height: 20),
           _TopProductsSection(products: data.topProducts),
@@ -806,79 +963,12 @@ class _RevenueTab extends ConsumerWidget {
           _Card(
             title: 'Revenue Trend',
             trailing: _Badge(text: '${data.trend.length} points'),
-            child: data.trend.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text(
-                        'No trend data for this period',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: data.trend.map((point) {
-                      final label = _formatTrendLabel(point.period);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                label,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${point.orders} orders',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textLight,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              formatCurrency(point.revenue),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            child: RevenueLineChart(trend: data.trend),
           ),
           const SizedBox(height: 20),
         ],
       ),
     );
-  }
-
-  String _formatTrendLabel(Map<String, dynamic> period) {
-    final day = period['day'];
-    final month = period['month'];
-    final year = period['year'];
-    final hour = period['hour'];
-    if (hour != null) {
-      return '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')} $year ${hour.toString().padLeft(2, '0')}:00';
-    }
-    if (day != null && month != null) {
-      return '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/$year';
-    }
-    if (month != null) {
-      return '${month.toString().padLeft(2, '0')}/$year';
-    }
-    return year?.toString() ?? '-';
   }
 }
 
@@ -962,17 +1052,6 @@ class _OrdersTab extends ConsumerWidget {
       );
     }
 
-    final statusColors = {
-      'pending': AppTheme.warning,
-      'confirmed': AppTheme.info,
-      'preparing': AppTheme.secondary,
-      'ready': const Color(0xFF8B5CF6),
-      'out_for_delivery': const Color(0xFFF59E0B),
-      'delivered': AppTheme.success,
-      'cancelled': AppTheme.error,
-      'refunded': AppTheme.textLight,
-    };
-
     return RefreshIndicator(
       onRefresh: () async =>
           ref.read(analyticsProvider.notifier).refreshCurrentTab(),
@@ -982,141 +1061,15 @@ class _OrdersTab extends ConsumerWidget {
           _Card(
             title: 'Order Status',
             trailing: _Badge(text: '${data.totalOrders} total'),
-            child: data.statusBreakdown.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text(
-                        'No order data',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: data.statusBreakdown.entries.map((entry) {
-                      final count = entry.value is int ? entry.value as int : 0;
-                      final total = data.totalOrders == 0
-                          ? 1
-                          : data.totalOrders;
-                      final percent = (count / total).clamp(0.0, 1.0);
-                      final color =
-                          statusColors[entry.key] ?? AppTheme.textSecondary;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  entry.key
-                                      .toString()
-                                      .split('_')
-                                      .map(
-                                        (w) =>
-                                            w[0].toUpperCase() + w.substring(1),
-                                      )
-                                      .join(' '),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: color,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '$count',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '(${percent > 0 ? (percent * 100).toStringAsFixed(0) : 0}%)',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.textLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: percent,
-                                backgroundColor: AppTheme.background,
-                                color: color,
-                                minHeight: 6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            child: OrderStatusMapDonutChart(
+              statusBreakdown: data.statusBreakdown,
+              totalOrders: data.totalOrders,
+            ),
           ),
           const SizedBox(height: 20),
           _Card(
             title: 'Daily Trend',
-            child: data.dailyTrend.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text(
-                        'No daily trend data',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: data.dailyTrend.map((d) {
-                      final label =
-                          '${d.date['day'].toString().padLeft(2, '0')}/${d.date['month'].toString().padLeft(2, '0')}/${d.date['year']}';
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                label,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${d.orders} orders',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textLight,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              formatCurrency(d.revenue),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            child: DailyOrdersBarChart(dailyTrend: data.dailyTrend),
           ),
           const SizedBox(height: 20),
           _Card(
@@ -1282,6 +1235,47 @@ class _ErrorBanner extends StatelessWidget {
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyStateCard extends StatelessWidget {
+  final String message;
+
+  const _EmptyStateCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.textSecondary.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.analytics_outlined,
+            size: 48,
+            color: AppTheme.textSecondary.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+              height: 1.5,
             ),
           ),
         ],

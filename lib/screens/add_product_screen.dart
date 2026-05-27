@@ -26,8 +26,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   final _discountController = TextEditingController();
 
   String _selectedCategory = 'Snacks';
+  String _selectedFoodType = 'Veg';
   bool _isAvailable = true;
-  bool _isFeatured = false;
   final List<File> _productImageFiles = [];
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
@@ -47,6 +47,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     'Chinese',
     'Desserts',
   ];
+
+  final List<String> _foodTypes = ['Veg', 'Non-Veg'];
 
   static const Map<String, String> _categoryToApiValue = {
     'Snacks': 'snacks',
@@ -101,9 +103,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       SecureLogger.info('Opening image picker');
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        imageQuality: 90,
-        maxWidth: 1200,
-        maxHeight: 1200,
+        imageQuality: 75,
+        maxWidth: 800,
+        maxHeight: 800,
       );
 
       SecureLogger.info('Image picked: ${image != null ? 'yes' : 'no'}');
@@ -273,7 +275,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'description': _descriptionController.text.trim(),
         'price': price,
         'category': normalizedCategory,
-        'isFeatured': _isFeatured,
+        'foodType': _selectedFoodType.toLowerCase().replaceAll(' ', '-'),
         ...?discountPercentage != null
             ? {'discountPercentage': discountPercentage}
             : null,
@@ -446,6 +448,41 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                   });
                 },
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedFoodType,
+                decoration: InputDecoration(
+                  labelText: 'Food Type',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.primary),
+                  ),
+                ),
+                items: _foodTypes.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 12,
+                          color: type == 'Veg' ? Colors.green : Colors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(type),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFoodType = value!;
+                  });
+                },
+              ),
               const SizedBox(height: 24),
 
               // Product Status
@@ -458,17 +495,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 onChanged: (value) {
                   setState(() {
                     _isAvailable = value;
-                  });
-                },
-                activeThumbColor: AppTheme.primary,
-              ),
-              SwitchListTile(
-                title: const Text('Featured'),
-                subtitle: const Text('Show in featured products section'),
-                value: _isFeatured,
-                onChanged: (value) {
-                  setState(() {
-                    _isFeatured = value;
                   });
                 },
                 activeThumbColor: AppTheme.primary,

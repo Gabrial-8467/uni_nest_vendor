@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vendor_notification.dart';
 import '../providers/vendor_notification_provider.dart';
-import '../services/vendor_push_notification_service.dart';
 import '../utils/app_theme.dart';
 import 'order_details_screen.dart';
 import 'payment_details_screen.dart';
@@ -82,9 +81,6 @@ class VendorNotificationScreen extends ConsumerWidget {
             offset: const Offset(0, 40),
             onSelected: (value) {
               switch (value) {
-                case 'test_push':
-                  _sendTestPushNotification(context);
-                  break;
                 case 'mark_all_read':
                   ref.read(vendorNotificationProvider.notifier).markAllAsRead();
                   break;
@@ -99,16 +95,6 @@ class VendorNotificationScreen extends ConsumerWidget {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'test_push',
-                child: Row(
-                  children: [
-                    Icon(Icons.notification_add_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Send test push'),
-                  ],
-                ),
-              ),
               const PopupMenuItem(
                 value: 'refresh',
                 child: Row(
@@ -610,41 +596,6 @@ class VendorNotificationScreen extends ConsumerWidget {
       icon: const Icon(Icons.mark_email_read_outlined),
       label: const Text('Mark All Read'),
     );
-  }
-
-  Future<void> _sendTestPushNotification(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Sending test push notification...'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    try {
-      await VendorPushNotificationService.registerCurrentToken();
-      await VendorPushNotificationService.sendTestNotification();
-
-      if (!context.mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Test push notification sent'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (error) {
-      if (!context.mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Failed to send test push: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   /// Show delete confirmation dialog

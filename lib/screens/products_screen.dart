@@ -30,6 +30,7 @@ import '../config/vendor_config.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 import '../utils/product_image_helper.dart';
+import '../models/vendor_models.dart';
 import '../services/image_upload_service.dart';
 import '../utils/secure_logger.dart';
 import 'add_product_screen.dart';
@@ -435,6 +436,36 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 }
 
+class _FoodTypeBadge extends StatelessWidget {
+  final String foodType;
+
+  const _FoodTypeBadge({required this.foodType});
+
+  @override
+  Widget build(BuildContext context) {
+    final isVeg = foodType == 'veg';
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(
+          color: isVeg ? Colors.green : Colors.red,
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.circle,
+          size: 8,
+          color: isVeg ? Colors.green : Colors.red,
+        ),
+      ),
+    );
+  }
+}
+
 class ProductCard extends StatelessWidget {
   final dynamic product;
   final VoidCallback onEdit;
@@ -592,9 +623,22 @@ class ProductCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      product.category ?? 'Uncategorized',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    Row(
+                      children: [
+                        Text(
+                          product.category ?? 'Uncategorized',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _FoodTypeBadge(
+                          foodType: product is Product
+                              ? product.foodType
+                              : (product['foodType']?.toString() ?? 'veg'),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -694,8 +738,8 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   final _discountController = TextEditingController();
 
   String _selectedCategory = 'Snacks';
+  String _selectedFoodType = 'Veg';
   bool _isAvailable = true;
-  bool _isFeatured = false;
   final List<File> _productImageFiles = [];
   List<String> _uploadedImageUrls = [];
   final ImagePicker _imagePicker = ImagePicker();
@@ -741,7 +785,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
       product.category?.toString() ?? 'snacks',
     );
     _isAvailable = product.isAvailable ?? true;
-    _isFeatured = product.isFeatured ?? false;
+    _selectedFoodType = product.foodType == 'non-veg' ? 'Non-Veg' : 'Veg';
 
     // Handle existing images - convert URLs to display
     final existingImages = product.images ?? [];
@@ -840,9 +884,9 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        imageQuality: 90,
-        maxWidth: 1200,
-        maxHeight: 1200,
+        imageQuality: 75,
+        maxWidth: 800,
+        maxHeight: 800,
       );
 
       if (image != null && mounted) {
@@ -1085,10 +1129,10 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
           'description': _descriptionController.text.trim(),
           'price': double.parse(_priceController.text),
           'category': normalizedCategory,
+          'foodType': _selectedFoodType.toLowerCase().replaceAll(' ', '-'),
           'images': finalImageUrls,
           'availability': _isAvailable ? 'in_stock' : 'out_of_stock',
           'stock': stockQuantity,
-          'isFeatured': _isFeatured,
         };
 
         success = await vendorProvider.updateProduct(
@@ -1102,9 +1146,9 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
           'description': _descriptionController.text.trim(),
           'price': double.parse(_priceController.text),
           'category': normalizedCategory,
+          'foodType': _selectedFoodType.toLowerCase().replaceAll(' ', '-'),
           'availability': _isAvailable ? 'in_stock' : 'out_of_stock',
           'stock': stockQuantity,
-          'isFeatured': _isFeatured,
         };
 
         success = await vendorProvider.createProduct(
@@ -1282,6 +1326,10 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                       _buildCategoryField(),
                       const SizedBox(height: 20),
 
+                      // Food Type
+                      _buildFoodTypeField(),
+                      const SizedBox(height: 20),
+
                       // Price and Stock Row
                       Row(
                         children: [
@@ -1435,82 +1483,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            // Featured Toggle
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.03),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: _isFeatured
-                                          ? Colors.amber.withValues(alpha: 0.1)
-                                          : Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      Icons.star,
-                                      color: _isFeatured
-                                          ? Colors.amber
-                                          : Colors.grey[400],
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Featured',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: _isFeatured
-                                                ? Colors.amber
-                                                : Colors.grey[700],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Show in featured products',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Transform.scale(
-                                    scale: 1.2,
-                                    child: Switch(
-                                      value: _isFeatured,
-                                      onChanged: (value) =>
-                                          setState(() => _isFeatured = value),
-                                      activeThumbColor: Colors.amber,
-                                      activeTrackColor: Colors.amber.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      inactiveThumbColor: Colors.grey[400],
-                                      inactiveTrackColor: Colors.grey[300],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -1810,6 +1782,72 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
           onChanged: (value) {
             setState(() {
               _selectedCategory = value!;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFoodTypeField() {
+    final foodTypes = ['Veg', 'Non-Veg'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Food Type',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2D3436),
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedFoodType,
+          decoration: InputDecoration(
+            prefixIcon: Icon(
+              Icons.local_dining_outlined,
+              color: AppTheme.primary,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.primary, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          items: foodTypes.map((type) {
+            return DropdownMenuItem(
+              value: type,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 12,
+                    color: type == 'Veg' ? Colors.green : Colors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(type),
+                ],
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedFoodType = value!;
             });
           },
         ),

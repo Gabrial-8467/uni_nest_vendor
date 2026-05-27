@@ -344,42 +344,52 @@ class VendorApiClient {
 
   Future<Map<String, dynamic>> getAnalytics({
     String period = 'lifetime',
+    bool skipCache = false,
   }) async {
     final response = await _request(
       method: 'GET',
       path: '/analytics',
       queryParameters: {'period': period},
+      skipCache: skipCache,
     );
     return _asMap(response['data']);
   }
 
   Future<Map<String, dynamic>> getProductAnalytics({
     String period = '7d',
+    bool skipCache = false,
   }) async {
     final response = await _request(
       method: 'GET',
       path: '/analytics/products',
       queryParameters: {'period': period},
+      skipCache: skipCache,
     );
     return _asMap(response['data']);
   }
 
   Future<Map<String, dynamic>> getRevenueAnalytics({
     String period = '7d',
+    bool skipCache = false,
   }) async {
     final response = await _request(
       method: 'GET',
       path: '/analytics/revenue',
       queryParameters: {'period': period},
+      skipCache: skipCache,
     );
     return _asMap(response['data']);
   }
 
-  Future<Map<String, dynamic>> getOrderAnalytics({String period = '7d'}) async {
+  Future<Map<String, dynamic>> getOrderAnalytics({
+    String period = '7d',
+    bool skipCache = false,
+  }) async {
     final response = await _request(
       method: 'GET',
       path: '/analytics/orders',
       queryParameters: {'period': period},
+      skipCache: skipCache,
     );
     return _asMap(response['data']);
   }
@@ -681,6 +691,7 @@ class VendorApiClient {
     bool requiresAuth = true,
     Map<String, dynamic>? body,
     Map<String, String>? queryParameters,
+    bool skipCache = false,
   }) async {
     final normalizedBase = _baseUrl.endsWith('/')
         ? _baseUrl.substring(0, _baseUrl.length - 1)
@@ -698,7 +709,7 @@ class VendorApiClient {
     final normalizedMethod = method.toUpperCase();
     final cacheKey = '$normalizedMethod:$uri';
 
-    if (normalizedMethod == 'GET') {
+    if (normalizedMethod == 'GET' && !skipCache) {
       final cached = _getCache[cacheKey];
       if (cached != null && !cached.isExpired) {
         return cached.data;
