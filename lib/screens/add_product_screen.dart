@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 import '../services/image_upload_service.dart';
@@ -26,7 +25,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   final _discountController = TextEditingController();
 
   String _selectedCategory = 'Snacks';
-  String _selectedFoodType = 'Veg';
   bool _isAvailable = true;
   final List<File> _productImageFiles = [];
   final ImagePicker _imagePicker = ImagePicker();
@@ -47,8 +45,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     'Chinese',
     'Desserts',
   ];
-
-  final List<String> _foodTypes = ['Veg', 'Non-Veg'];
 
   static const Map<String, String> _categoryToApiValue = {
     'Snacks': 'snacks',
@@ -77,30 +73,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     try {
       SecureLogger.info('Starting image pick from source: $source');
 
-      // Request permissions first
-      bool hasPermission = false;
-
-      if (source == ImageSource.camera) {
-        SecureLogger.info('Requesting camera permission');
-        hasPermission = await PermissionService.requestPermission(
-          Permission.camera,
-        );
-      } else {
-        SecureLogger.info('Requesting storage permission');
-        // Use requestStoragePermission() which handles Android 13+ properly
-        hasPermission = await PermissionService.requestStoragePermission();
-      }
-
-      SecureLogger.info('Image permission granted: $hasPermission');
-
-      if (!hasPermission) {
-        if (mounted) {
-          _showPermissionDeniedDialog(source);
-        }
-        return;
-      }
-
-      SecureLogger.info('Opening image picker');
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 75,
@@ -108,13 +80,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         maxHeight: 800,
       );
 
-      SecureLogger.info('Image picked: ${image != null ? 'yes' : 'no'}');
-
       if (image != null && mounted) {
         final imageFile = File(image.path);
+
         // Validate and optimize the image
         if (!ImageUploadService.isValidImageFile(imageFile)) {
-          SecureLogger.warning('Invalid image file format');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -131,24 +101,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         setState(() {
           _productImageFiles.add(imageFile);
         });
-
-        SecureLogger.info(
-          'Image added successfully. Total images: ${_productImageFiles.length}',
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Image added successfully (${_productImageFiles.length} total)',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        SecureLogger.info('Image added to selection: ${image.path}');
       }
     } catch (e) {
-      SecureLogger.error('Error picking image', error: e);
+      SecureLogger.error('Failed to pick image', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -160,49 +116,29 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     }
   }
 
-  Future<void> _showPermissionDeniedDialog(ImageSource source) async {
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Permission Required'),
-        content: Text(
-          source == ImageSource.camera
-              ? 'Camera permission is needed to take photos. Please enable it in app settings.'
-              : 'Storage permission is needed to select images. Please enable it in app settings.',
+  void _showImagePicker() async {
+    final status = await PermissionService.requestStoragePermission();
+    if (!status && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Storage permission is required to select images'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Open app settings
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
-    );
-  }
+      );
+      return;
+    }
 
-  Future<void> _showImagePicker() async {
-    await showModalBottomSheet(
+    if (!mounted) return;
+
+    showModalBottomSheet(
       context: context,
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            const Text(
               'Add Product Image',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             Row(
@@ -275,7 +211,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'description': _descriptionController.text.trim(),
         'price': price,
         'category': normalizedCategory,
-        'foodType': _selectedFoodType.toLowerCase().replaceAll(' ', '-'),
         ...?discountPercentage != null
             ? {'discountPercentage': discountPercentage}
             : null,
@@ -300,21 +235,26 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context, true);
+          Navigator.of(context).pop(true); // Return true to indicate success
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(vendorProvider.error ?? 'Failed to create product'),
+              content: Text(
+                vendorProvider.error ?? 'Failed to create product',
+              ),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
-      SecureLogger.error('Error creating product: $e');
+      SecureLogger.error('Form submission error', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -336,222 +276,182 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         elevation: 0,
         foregroundColor: AppTheme.textPrimary,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Product Images
-              _buildImageSection(),
-              const SizedBox(height: 24),
+      body: RepaintBoundary(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product Images
+                const _SectionTitle(title: 'Product Images'),
+                const SizedBox(height: 16),
+                _buildImageSection(),
+                const SizedBox(height: 24),
 
-              // Basic Information
-              _buildSectionTitle('Basic Information'),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _nameController,
-                label: 'Product Name',
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Product name is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Description is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-
-              // Pricing
-              _buildSectionTitle('Pricing'),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _priceController,
-                      label: 'Price (₹)',
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Price is required';
-                        }
-                        final price = double.tryParse(value);
-                        if (price == null || price <= 0) {
-                          return 'Please enter a valid price';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _discountController,
-                      label: 'Discount Price (₹)',
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value != null && value.trim().isNotEmpty) {
-                          final discountPrice = double.tryParse(value);
-                          if (discountPrice == null || discountPrice < 0) {
-                            return 'Invalid discount price';
-                          }
-                          final price = double.tryParse(_priceController.text);
-                          if (price != null && discountPrice >= price) {
-                            return 'Discount must be less than price';
-                          }
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Category & Stock
-              _buildSectionTitle('Category & Stock'),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
-                decoration: InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.primary),
-                  ),
+                // Basic Information
+                const _SectionTitle(title: 'Basic Information'),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _nameController,
+                  label: 'Product Name',
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Product name is required';
+                    }
+                    return null;
+                  },
                 ),
-                items: _categories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedFoodType,
-                decoration: InputDecoration(
-                  labelText: 'Food Type',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.primary),
-                  ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _descriptionController,
+                  label: 'Description',
+                  maxLines: 3,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Description is required';
+                    }
+                    return null;
+                  },
                 ),
-                items: _foodTypes.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 12,
-                          color: type == 'Veg' ? Colors.green : Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(type),
-                      ],
+                const SizedBox(height: 24),
+
+                // Pricing
+                const _SectionTitle(title: 'Pricing'),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _priceController,
+                        label: 'Price (₹)',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Price is required';
+                          }
+                          final price = double.tryParse(value);
+                          if (price == null || price <= 0) {
+                            return 'Please enter a valid price';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFoodType = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _discountController,
+                        label: 'Discount Price (₹)',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            final discountPrice = double.tryParse(value);
+                            if (discountPrice == null || discountPrice < 0) {
+                              return 'Invalid discount price';
+                            }
+                            final price = double.tryParse(_priceController.text);
+                            if (price != null && discountPrice >= price) {
+                              return 'Discount must be less than price';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
-              // Product Status
-              _buildSectionTitle('Product Status'),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Available'),
-                subtitle: const Text('Product will be visible to customers'),
-                value: _isAvailable,
-                onChanged: (value) {
-                  setState(() {
-                    _isAvailable = value;
-                  });
-                },
-                activeThumbColor: AppTheme.primary,
-              ),
-              const SizedBox(height: 32),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
+                // Category & Stock
+                const _SectionTitle(title: 'Category & Stock'),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategory,
+                  decoration: InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primary),
+                    ),
                   ),
-                  child: _isLoading
-                      ? const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                  items: _categories.map((category) {
+                    return DropdownMenuItem(
+                      value: category,
+                      child: Text(category),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedCategory = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Product Status
+                const _SectionTitle(title: 'Product Status'),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Available'),
+                  subtitle: const Text('Product will be visible to customers'),
+                  value: _isAvailable,
+                  onChanged: (value) {
+                    setState(() {
+                      _isAvailable = value;
+                    });
+                  },
+                  activeThumbColor: AppTheme.primary,
+                ),
+                const SizedBox(height: 32),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submitForm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               ),
-                            ),
-                            SizedBox(width: 12),
-                            Text('Creating Product...'),
-                          ],
-                        )
-                      : const Text(
-                          'Create Product',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                              SizedBox(width: 12),
+                              Text('Creating Product...'),
+                            ],
+                          )
+                        : const Text(
+                            'Create Product',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: AppTheme.textPrimary,
       ),
     );
   }
@@ -563,17 +463,19 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.primary),
+    return RepaintBoundary(
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppTheme.primary),
+          ),
         ),
       ),
     );
@@ -583,8 +485,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Product Images'),
-        const SizedBox(height: 16),
         if (_productImageFiles.isEmpty)
           InkWell(
             onTap: _showImagePicker,
@@ -666,6 +566,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                           child: Image.file(
                             imageFile,
                             fit: BoxFit.cover,
+                            cacheWidth: 200, // Optimize image memory usage
+                            cacheHeight: 200,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
                                 color: Colors.grey[200],
@@ -715,6 +617,23 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   }
 }
 
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: AppTheme.textPrimary,
+      ),
+    );
+  }
+}
+
 class _ImagePickerOption extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -728,23 +647,14 @@ class _ImagePickerOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 32, color: AppTheme.primary),
-            const SizedBox(height: 8),
-            Text(label),
-          ],
-        ),
+      child: Column(
+        children: [
+          Icon(icon, size: 32, color: AppTheme.primary),
+          const SizedBox(height: 8),
+          Text(label),
+        ],
       ),
     );
   }

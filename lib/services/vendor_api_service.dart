@@ -370,10 +370,17 @@ class VendorApiService {
   static Future<List<Product>> getVendorProducts(
     String authToken, {
     String? status,
+    String? foodType,
   }) async {
-    final endpoint = status != null
-        ? '${ApiEndpoints.products}?status=$status'
+    final Map<String, String> queryParams = {};
+    if (status != null) queryParams['status'] = status;
+    if (foodType != null) queryParams['foodType'] = foodType;
+
+    final String queryString = Uri(queryParameters: queryParams).query;
+    final endpoint = queryString.isNotEmpty
+        ? '${ApiEndpoints.products}?$queryString'
         : ApiEndpoints.products;
+
     SecureLogger.info('Fetching products from: $endpoint', tag: 'PRODUCTS');
     final response = await _makeRequest(
       ApiMethods.get,
@@ -504,7 +511,12 @@ class VendorApiService {
         tag: 'PRODUCTS',
       );
 
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.Response.fromStream(streamedResponse).timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          throw TimeoutException('Reading response body timed out after 45s');
+        },
+      );
       SecureLogger.info(
         'Response status: ${response.statusCode}',
         tag: 'PRODUCTS',
@@ -549,7 +561,7 @@ class VendorApiService {
     // DEBUG: Print request details
     SecureLogger.info('=== UPDATE PRODUCT DEBUG ===', tag: 'PRODUCTS');
     SecureLogger.info('URL: $uri', tag: 'PRODUCTS');
-    SecureLogger.info('Method: PUT', tag: 'PRODUCTS');
+    SecureLogger.info('Method: PATCH', tag: 'PRODUCTS');
     SecureLogger.info(
       'Image files count: ${imageFiles?.length ?? 0}',
       tag: 'PRODUCTS',
@@ -557,7 +569,7 @@ class VendorApiService {
 
     // Check if we have files to upload - use multipart
     if (imageFiles != null && imageFiles.isNotEmpty) {
-      final request = http.MultipartRequest('PUT', uri);
+      final request = http.MultipartRequest('PATCH', uri);
 
       // Set headers correctly - NO Content-Type override for multipart
       request.headers['Authorization'] = 'Bearer $authToken';
@@ -613,7 +625,12 @@ class VendorApiService {
             throw TimeoutException('Product update timed out after 45 seconds');
           },
         );
-        final response = await http.Response.fromStream(streamedResponse);
+        final response = await http.Response.fromStream(streamedResponse).timeout(
+          const Duration(seconds: 45),
+          onTimeout: () {
+            throw TimeoutException('Reading response body timed out after 45s');
+          },
+        );
 
         // DEBUG: Print response details
         SecureLogger.info(
@@ -653,7 +670,7 @@ class VendorApiService {
       );
 
       final response = await _makeRequest(
-        ApiMethods.put,
+        ApiMethods.patch,
         ApiEndpoints.productById(productId),
         body: productData,
         authTokenOverride: authToken,
@@ -704,7 +721,12 @@ class VendorApiService {
       }
 
       final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.Response.fromStream(streamedResponse).timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          throw TimeoutException('Reading response body timed out after 45s');
+        },
+      );
       final data = _apiClient._decodeResponseBody(response.body);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -878,10 +900,14 @@ class VendorApiService {
     DateTime? startDate,
     DateTime? endDate,
     String? period,
+    String? foodType,
   }) async {
     final queryParams = <String, String>{};
     if (period != null) {
       queryParams['period'] = period;
+    }
+    if (foodType != null) {
+      queryParams['foodType'] = foodType;
     }
 
     final queryString = Uri(queryParameters: queryParams).query;

@@ -44,6 +44,13 @@ class VendorProvider extends ChangeNotifier {
   String? _ledgerError;
   String? _payoutsError;
 
+  // Analytics Cache
+  List<double>? _cachedDailyRevenueLast7Days;
+  double? _cachedRevenueGrowthPercentage;
+  double? _cachedAverageOrderValueGrowth;
+  double? _cachedOrdersGrowthPercentage;
+  String? _cachedPeakRevenueDay;
+
   // Authentication
   bool _isAuthenticated = false;
   String? _authToken;
@@ -78,6 +85,119 @@ class VendorProvider extends ChangeNotifier {
 
   bool get isAuthenticated => _isAuthenticated;
   String? get authToken => _authToken;
+
+  // Invalidate analytics cache
+  void _invalidateAnalyticsCache() {
+    _cachedDailyRevenueLast7Days = null;
+    _cachedRevenueGrowthPercentage = null;
+    _cachedAverageOrderValueGrowth = null;
+    _cachedOrdersGrowthPercentage = null;
+    _cachedPeakRevenueDay = null;
+  }
+
+  void _computeAnalytics() {
+    final now = DateTime.now();
+
+    // 1. Daily Revenue Last 7 Days
+    final List<double> dailyRevenue = [];
+    for (int i = 6; i >= 0; i--) {
+      final day = now.subtract(Duration(days: i));
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+
+      final dayRevenue = _orders
+          .where((order) =>
+              order.createdAt.isAfter(dayStart) &&
+              order.createdAt.isBefore(dayEnd))
+          .fold(0.0, (sum, order) => sum + order.finalAmount);
+      dailyRevenue.add(dayRevenue);
+    }
+    _cachedDailyRevenueLast7Days = dailyRevenue;
+
+    // 2. Growth Percentages
+    final currentPeriodStart = now.subtract(const Duration(days: 7));
+    final previousPeriodStart = now.subtract(const Duration(days: 14));
+
+    // Revenue Growth
+    final currentRevenue = _orders
+        .where((order) => order.createdAt.isAfter(currentPeriodStart))
+        .fold(0.0, (sum, order) => sum + order.finalAmount);
+
+    final previousRevenue = _orders
+        .where((order) =>
+            order.createdAt.isAfter(previousPeriodStart) &&
+            order.createdAt.isBefore(currentPeriodStart))
+        .fold(0.0, (sum, order) => sum + order.finalAmount);
+
+    if (previousRevenue == 0) {
+      _cachedRevenueGrowthPercentage = currentRevenue > 0 ? 100.0 : 0.0;
+    } else {
+      _cachedRevenueGrowthPercentage =
+          ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+    }
+
+    // Average Order Value Growth
+    final currentOrders = _orders
+        .where((order) => order.createdAt.isAfter(currentPeriodStart))
+        .toList();
+    final previousOrders = _orders
+        .where((order) =>
+            order.createdAt.isAfter(previousPeriodStart) &&
+            order.createdAt.isBefore(currentPeriodStart))
+        .toList();
+
+    if (currentOrders.isEmpty && previousOrders.isEmpty) {
+      _cachedAverageOrderValueGrowth = 0.0;
+    } else {
+      final currentAvg = currentOrders.isEmpty
+          ? 0.0
+          : currentOrders.fold(0.0, (sum, order) => sum + order.finalAmount) /
+              currentOrders.length;
+      final previousAvg = previousOrders.isEmpty
+          ? 0.0
+          : previousOrders.fold(0.0, (sum, order) => sum + order.finalAmount) /
+              previousOrders.length;
+
+      if (previousAvg == 0) {
+        _cachedAverageOrderValueGrowth = currentAvg > 0 ? 100.0 : 0.0;
+      } else {
+        _cachedAverageOrderValueGrowth =
+            ((currentAvg - previousAvg) / previousAvg) * 100;
+      }
+    }
+
+    // Orders Growth
+    final currentOrdersCount = currentOrders.length;
+    final previousOrdersCount = previousOrders.length;
+
+    if (previousOrdersCount == 0) {
+      _cachedOrdersGrowthPercentage = currentOrdersCount > 0 ? 100.0 : 0.0;
+    } else {
+      _cachedOrdersGrowthPercentage =
+          ((currentOrdersCount - previousOrdersCount) / previousOrdersCount) *
+              100;
+    }
+
+    // Peak Revenue Day
+    if (dailyRevenue.isEmpty) {
+      _cachedPeakRevenueDay = 'None';
+    } else {
+      final maxRev = dailyRevenue.reduce((a, b) => a > b ? a : b);
+      final maxIdx = dailyRevenue.indexOf(maxRev);
+      final pDay = now.subtract(Duration(days: 6 - maxIdx));
+
+      switch (pDay.weekday) {
+        case 1: _cachedPeakRevenueDay = 'Monday'; break;
+        case 2: _cachedPeakRevenueDay = 'Tuesday'; break;
+        case 3: _cachedPeakRevenueDay = 'Wednesday'; break;
+        case 4: _cachedPeakRevenueDay = 'Thursday'; break;
+        case 5: _cachedPeakRevenueDay = 'Friday'; break;
+        case 6: _cachedPeakRevenueDay = 'Saturday'; break;
+        case 7: _cachedPeakRevenueDay = 'Sunday'; break;
+        default: _cachedPeakRevenueDay = 'None';
+      }
+    }
+  }
 
   // Initialize provider
   Future<void> initialize() async {
@@ -432,6 +552,7 @@ class VendorProvider extends ChangeNotifier {
       _earnings = {};
       _settings = {};
 
+      _invalidateAnalyticsCache();
       notifyListeners();
     } catch (e) {
       SecureLogger.error('Failed to clear auth state', error: e);
@@ -445,15 +566,16 @@ class VendorProvider extends ChangeNotifier {
     }
 
     await Future.wait([
-      loadVendorProfile(),
-      loadProducts(force: forceProducts),
-      loadOrders(),
-      loadAnalytics(),
-      loadEarnings(),
-      loadLedger(),
-      loadPayouts(),
-      loadSettings(),
+      loadVendorProfile(silent: true),
+      loadProducts(force: forceProducts, silent: true),
+      loadOrders(silent: true),
+      loadAnalytics(silent: true),
+      loadEarnings(silent: true),
+      loadLedger(silent: true),
+      loadPayouts(silent: true),
+      loadSettings(silent: true),
     ]);
+    notifyListeners();
   }
 
   bool get _hasFreshProductsCache {
@@ -466,7 +588,7 @@ class VendorProvider extends ChangeNotifier {
   }
 
   // Load products
-  Future<void> loadProducts({bool force = false}) async {
+  Future<void> loadProducts({bool force = false, bool silent = false}) async {
     if (!force && _hasFreshProductsCache) {
       SecureLogger.info(
         'Using cached products (${_products.length})',
@@ -480,7 +602,7 @@ class VendorProvider extends ChangeNotifier {
       return _productsLoadFuture;
     }
 
-    _productsLoadFuture = _loadProductsFromServer();
+    _productsLoadFuture = _loadProductsFromServer(silent: silent);
     try {
       await _productsLoadFuture;
     } finally {
@@ -488,16 +610,18 @@ class VendorProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadProductsFromServer() async {
+  Future<void> _loadProductsFromServer({bool silent = false}) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
-    _setLoadingProducts(true);
+    _setLoadingProducts(true, silent: silent);
     _productsError = null;
 
     try {
-      _products = await VendorApiService.getVendorProducts(_authToken!);
+      _products = await VendorApiService.getVendorProducts(
+        _authToken!,
+      );
       _productsLastLoadedAt = DateTime.now();
       SecureLogger.info('Loaded ${_products.length} products', tag: 'PRODUCTS');
     } catch (e) {
@@ -505,7 +629,7 @@ class VendorProvider extends ChangeNotifier {
       _productsError = 'Failed to load products: ${e.toString()}';
       SecureLogger.error('Failed to load products', error: e);
     } finally {
-      _setLoadingProducts(false);
+      _setLoadingProducts(false, silent: silent);
     }
   }
 
@@ -514,12 +638,13 @@ class VendorProvider extends ChangeNotifier {
     String? status,
     DateTime? startDate,
     DateTime? endDate,
+    bool silent = false,
   }) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
-    _setLoadingOrders(true);
+    _setLoadingOrders(true, silent: silent);
     _ordersError = null;
 
     try {
@@ -529,23 +654,28 @@ class VendorProvider extends ChangeNotifier {
         startDate: startDate,
         endDate: endDate,
       );
+      _invalidateAnalyticsCache();
       SecureLogger.info('Loaded ${_orders.length} orders', tag: 'ORDERS');
     } catch (e) {
       await _handleUnauthorizedIfNeeded(e);
       _ordersError = 'Failed to load orders: ${e.toString()}';
       SecureLogger.error('Failed to load orders', error: e);
     } finally {
-      _setLoadingOrders(false);
+      _setLoadingOrders(false, silent: silent);
     }
   }
 
   // Load analytics
-  Future<void> loadAnalytics({DateTime? startDate, DateTime? endDate}) async {
+  Future<void> loadAnalytics({
+    DateTime? startDate,
+    DateTime? endDate,
+    bool silent = false,
+  }) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
-    _setLoadingAnalytics(true);
+    _setLoadingAnalytics(true, silent: silent);
     _analyticsError = null;
 
     try {
@@ -560,17 +690,21 @@ class VendorProvider extends ChangeNotifier {
       _analyticsError = 'Failed to load analytics: ${e.toString()}';
       SecureLogger.error('Failed to load analytics', error: e);
     } finally {
-      _setLoadingAnalytics(false);
+      _setLoadingAnalytics(false, silent: silent);
     }
   }
 
   // Load earnings
-  Future<void> loadEarnings({DateTime? startDate, DateTime? endDate}) async {
+  Future<void> loadEarnings({
+    DateTime? startDate,
+    DateTime? endDate,
+    bool silent = false,
+  }) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
-    _setLoadingEarnings(true);
+    _setLoadingEarnings(true, silent: silent);
     _earningsError = null;
 
     try {
@@ -594,16 +728,16 @@ class VendorProvider extends ChangeNotifier {
       _earningsError = 'Failed to load earnings: ${e.toString()}';
       SecureLogger.error('Failed to load earnings', error: e);
     } finally {
-      _setLoadingEarnings(false);
+      _setLoadingEarnings(false, silent: silent);
     }
   }
 
-  Future<void> loadLedger() async {
+  Future<void> loadLedger({bool silent = false}) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
-    _setLoadingLedger(true);
+    _setLoadingLedger(true, silent: silent);
     _ledgerError = null;
 
     try {
@@ -614,16 +748,16 @@ class VendorProvider extends ChangeNotifier {
       _ledgerError = 'Failed to load ledger: ${e.toString()}';
       SecureLogger.error('Failed to load ledger', error: e);
     } finally {
-      _setLoadingLedger(false);
+      _setLoadingLedger(false, silent: silent);
     }
   }
 
-  Future<void> loadPayouts() async {
+  Future<void> loadPayouts({bool silent = false}) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
 
-    _setLoadingPayouts(true);
+    _setLoadingPayouts(true, silent: silent);
     _payoutsError = null;
 
     try {
@@ -637,12 +771,12 @@ class VendorProvider extends ChangeNotifier {
       _payoutsError = 'Failed to load payouts: ${e.toString()}';
       SecureLogger.error('Failed to load payouts', error: e);
     } finally {
-      _setLoadingPayouts(false);
+      _setLoadingPayouts(false, silent: silent);
     }
   }
 
   // Load settings
-  Future<void> loadSettings() async {
+  Future<void> loadSettings({bool silent = false}) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
@@ -661,6 +795,7 @@ class VendorProvider extends ChangeNotifier {
       }
 
       SecureLogger.info('Loaded vendor settings', tag: 'SETTINGS');
+      if (!silent) notifyListeners();
     } catch (e) {
       await _handleUnauthorizedIfNeeded(e);
       SecureLogger.error('Failed to load settings', error: e);
@@ -753,7 +888,7 @@ class VendorProvider extends ChangeNotifier {
   }
 
   // Load vendor profile
-  Future<void> loadVendorProfile() async {
+  Future<void> loadVendorProfile({bool silent = false}) async {
     if (!await _ensureAuthenticatedSession()) {
       return;
     }
@@ -763,6 +898,7 @@ class VendorProvider extends ChangeNotifier {
       _currentVendor = vendor;
       await _saveAuthState();
       SecureLogger.info('Vendor profile loaded', tag: 'PROFILE');
+      if (!silent) notifyListeners();
     } catch (e) {
       await _handleUnauthorizedIfNeeded(e);
       SecureLogger.error('Failed to load vendor profile', error: e);
@@ -970,6 +1106,7 @@ class VendorProvider extends ChangeNotifier {
       final index = _orders.indexWhere((o) => o.id == orderId);
       if (index != -1) {
         _orders[index] = updatedOrder;
+        _invalidateAnalyticsCache();
       }
 
       SecureLogger.info(
@@ -991,39 +1128,39 @@ class VendorProvider extends ChangeNotifier {
   }
 
   // Helper methods
-  void _setLoading(bool loading) {
+  void _setLoading(bool loading, {bool silent = false}) {
     _isLoading = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
-  void _setLoadingProducts(bool loading) {
+  void _setLoadingProducts(bool loading, {bool silent = false}) {
     _isLoadingProducts = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
-  void _setLoadingOrders(bool loading) {
+  void _setLoadingOrders(bool loading, {bool silent = false}) {
     _isLoadingOrders = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
-  void _setLoadingAnalytics(bool loading) {
+  void _setLoadingAnalytics(bool loading, {bool silent = false}) {
     _isLoadingAnalytics = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
-  void _setLoadingEarnings(bool loading) {
+  void _setLoadingEarnings(bool loading, {bool silent = false}) {
     _isLoadingEarnings = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
-  void _setLoadingLedger(bool loading) {
+  void _setLoadingLedger(bool loading, {bool silent = false}) {
     _isLoadingLedger = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
-  void _setLoadingPayouts(bool loading) {
+  void _setLoadingPayouts(bool loading, {bool silent = false}) {
     _isLoadingPayouts = loading;
-    notifyListeners();
+    if (!silent) notifyListeners();
   }
 
   // JSON encoding/decoding helpers
@@ -1112,135 +1249,42 @@ class VendorProvider extends ChangeNotifier {
 
   // Get daily revenue for the last 7 days
   List<double> get dailyRevenueLast7Days {
-    final now = DateTime.now();
-    final List<double> dailyRevenue = [];
-
-    for (int i = 6; i >= 0; i--) {
-      final day = now.subtract(Duration(days: i));
-      final dayStart = DateTime(day.year, day.month, day.day);
-      final dayEnd = dayStart.add(const Duration(days: 1));
-
-      final dayOrders = _orders.where((order) {
-        return order.createdAt.isAfter(dayStart) &&
-            order.createdAt.isBefore(dayEnd);
-      }).toList();
-
-      final dayRevenue = dayOrders.fold(
-        0.0,
-        (sum, order) => sum + order.finalAmount,
-      );
-      dailyRevenue.add(dayRevenue);
+    if (_cachedDailyRevenueLast7Days == null) {
+      _computeAnalytics();
     }
-
-    return dailyRevenue;
+    return _cachedDailyRevenueLast7Days!;
   }
 
   // Get revenue growth percentage (last 7 days vs previous 7 days)
   double get revenueGrowthPercentage {
-    final now = DateTime.now();
-    final currentPeriodStart = now.subtract(const Duration(days: 7));
-    final previousPeriodStart = now.subtract(const Duration(days: 14));
-
-    final currentRevenue = _orders
-        .where((order) => order.createdAt.isAfter(currentPeriodStart))
-        .fold(0.0, (sum, order) => sum + order.finalAmount);
-
-    final previousRevenue = _orders
-        .where(
-          (order) =>
-              order.createdAt.isAfter(previousPeriodStart) &&
-              order.createdAt.isBefore(currentPeriodStart),
-        )
-        .fold(0.0, (sum, order) => sum + order.finalAmount);
-
-    if (previousRevenue == 0) return currentRevenue > 0 ? 100.0 : 0.0;
-    return ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+    if (_cachedRevenueGrowthPercentage == null) {
+      _computeAnalytics();
+    }
+    return _cachedRevenueGrowthPercentage!;
   }
 
   // Get average order value growth percentage
   double get averageOrderValueGrowth {
-    final now = DateTime.now();
-    final currentPeriodStart = now.subtract(const Duration(days: 7));
-    final previousPeriodStart = now.subtract(const Duration(days: 14));
-
-    final currentOrders = _orders
-        .where((order) => order.createdAt.isAfter(currentPeriodStart))
-        .toList();
-    final previousOrders = _orders
-        .where(
-          (order) =>
-              order.createdAt.isAfter(previousPeriodStart) &&
-              order.createdAt.isBefore(currentPeriodStart),
-        )
-        .toList();
-
-    if (currentOrders.isEmpty && previousOrders.isEmpty) return 0.0;
-
-    final currentAvg = currentOrders.isEmpty
-        ? 0.0
-        : currentOrders.fold(0.0, (sum, order) => sum + order.finalAmount) /
-              currentOrders.length;
-    final previousAvg = previousOrders.isEmpty
-        ? 0.0
-        : previousOrders.fold(0.0, (sum, order) => sum + order.finalAmount) /
-              previousOrders.length;
-
-    if (previousAvg == 0) return currentAvg > 0 ? 100.0 : 0.0;
-    return ((currentAvg - previousAvg) / previousAvg) * 100;
+    if (_cachedAverageOrderValueGrowth == null) {
+      _computeAnalytics();
+    }
+    return _cachedAverageOrderValueGrowth!;
   }
 
   // Get orders growth percentage
   double get ordersGrowthPercentage {
-    final now = DateTime.now();
-    final currentPeriodStart = now.subtract(const Duration(days: 7));
-    final previousPeriodStart = now.subtract(const Duration(days: 14));
-
-    final currentOrders = _orders
-        .where((order) => order.createdAt.isAfter(currentPeriodStart))
-        .length;
-    final previousOrders = _orders
-        .where(
-          (order) =>
-              order.createdAt.isAfter(previousPeriodStart) &&
-              order.createdAt.isBefore(currentPeriodStart),
-        )
-        .length;
-
-    if (previousOrders == 0) return currentOrders > 0 ? 100.0 : 0.0;
-    return ((currentOrders - previousOrders) / previousOrders) * 100;
+    if (_cachedOrdersGrowthPercentage == null) {
+      _computeAnalytics();
+    }
+    return _cachedOrdersGrowthPercentage!;
   }
 
   // Get peak revenue day in the last 7 days
   String get peakRevenueDay {
-    final dailyRevenue = dailyRevenueLast7Days;
-
-    if (dailyRevenue.isEmpty) return 'None';
-
-    final maxRevenue = dailyRevenue.reduce((a, b) => a > b ? a : b);
-    final maxIndex = dailyRevenue.indexOf(maxRevenue);
-
-    // Calculate the actual day of week for the peak day
-    final now = DateTime.now();
-    final peakDay = now.subtract(Duration(days: 6 - maxIndex));
-
-    switch (peakDay.weekday) {
-      case 1:
-        return 'Monday';
-      case 2:
-        return 'Tuesday';
-      case 3:
-        return 'Wednesday';
-      case 4:
-        return 'Thursday';
-      case 5:
-        return 'Friday';
-      case 6:
-        return 'Saturday';
-      case 7:
-        return 'Sunday';
-      default:
-        return 'Unknown';
+    if (_cachedPeakRevenueDay == null) {
+      _computeAnalytics();
     }
+    return _cachedPeakRevenueDay!;
   }
 
   // Get new products count (last 30 days)

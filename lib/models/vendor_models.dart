@@ -238,7 +238,6 @@ class Product {
   final String description;
   final double price;
   final String category;
-  final String foodType;
   final List<String> images;
   final bool isAvailable;
   final int stockQuantity;
@@ -255,7 +254,6 @@ class Product {
     required this.description,
     required this.price,
     required this.category,
-    this.foodType = 'veg',
     required this.images,
     required this.isAvailable,
     required this.stockQuantity,
@@ -389,9 +387,6 @@ class Product {
       description: _readString(json['description']),
       price: _toDouble(json['price']),
       category: _readString(json['category']),
-      foodType: _readString(json['foodType']).isEmpty
-          ? 'veg'
-          : _readString(json['foodType']),
       images: _extractImages(json),
       isAvailable: isAvailable,
       stockQuantity: stockQuantity,
@@ -419,7 +414,6 @@ class Product {
       'description': description,
       'price': price,
       'category': category,
-      'foodType': foodType,
       'images': images,
       'isAvailable': isAvailable,
       'stockQuantity': stockQuantity,
@@ -447,7 +441,6 @@ class Product {
     String? description,
     double? price,
     String? category,
-    String? foodType,
     List<String>? images,
     bool? isAvailable,
     int? stockQuantity,
@@ -464,7 +457,6 @@ class Product {
       description: description ?? this.description,
       price: price ?? this.price,
       category: category ?? this.category,
-      foodType: foodType ?? this.foodType,
       images: images ?? this.images,
       isAvailable: isAvailable ?? this.isAvailable,
       stockQuantity: stockQuantity ?? this.stockQuantity,

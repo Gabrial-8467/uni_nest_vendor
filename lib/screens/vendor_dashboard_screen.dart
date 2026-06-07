@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/auth_service.dart';
-import '../services/vendor_api_service.dart';
+import '../providers/vendor_notification_provider.dart';
 import '../state/vendor_provider.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_assets.dart';
@@ -50,15 +49,9 @@ class VendorDashboardScreen extends ConsumerStatefulWidget {
 class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
-  bool _hasUnreadNotifications = false;
-  bool _isFetchingNotificationStatus = false;
-  DateTime? _lastNotificationFetchAt;
   late PageController _pageController;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  Timer? _notificationPollTimer;
-  static const Duration _notificationPollInterval = Duration(seconds: 60);
-  static const Duration _notificationMinFetchGap = Duration(seconds: 45);
 
   @override
   void initState() {
@@ -73,70 +66,22 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
     );
 
     _animationController.forward();
-    _loadUnreadNotificationStatus(force: true);
-    _notificationPollTimer = Timer.periodic(
-      _notificationPollInterval,
-      (_) => _loadUnreadNotificationStatus(),
-    );
+
+    // Start notification polling via Riverpod provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(vendorNotificationProvider.notifier).loadNotifications(silent: true);
+      ref.read(vendorNotificationProvider.notifier).startPolling();
+    });
   }
 
   @override
   void dispose() {
-    _notificationPollTimer?.cancel();
+    // Note: Notification polling is tied to the controller's lifecycle,
+    // but we can stop it here if we want it to only run while dashboard is active.
+    ref.read(vendorNotificationProvider.notifier).stopPolling();
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadUnreadNotificationStatus({bool force = false}) async {
-    if (_isFetchingNotificationStatus) {
-      return;
-    }
-
-    if (!force && _lastNotificationFetchAt != null) {
-      final elapsed = DateTime.now().difference(_lastNotificationFetchAt!);
-      if (elapsed < _notificationMinFetchGap) {
-        return;
-      }
-    }
-
-    _isFetchingNotificationStatus = true;
-    try {
-      final authToken = await AuthService().getAuthToken();
-      if (authToken == null || authToken.isEmpty) {
-        if (mounted && _hasUnreadNotifications) {
-          setState(() {
-            _hasUnreadNotifications = false;
-          });
-        }
-        return;
-      }
-
-      final response = await VendorApiService.getNotifications(authToken);
-      _lastNotificationFetchAt = DateTime.now();
-      final notifications =
-          (response['data']?['notifications'] as List<dynamic>?) ?? [];
-
-      final hasUnread = notifications.any((raw) {
-        if (raw is! Map) {
-          return false;
-        }
-
-        final status = raw['status']?.toString().toLowerCase() ?? '';
-        final isRead = raw['isRead'] == true || status == 'read';
-        return !isRead;
-      });
-
-      if (mounted && _hasUnreadNotifications != hasUnread) {
-        setState(() {
-          _hasUnreadNotifications = hasUnread;
-        });
-      }
-    } catch (_) {
-      // Keep last known indicator state; avoid noisy UI failures for badge poll.
-    } finally {
-      _isFetchingNotificationStatus = false;
-    }
   }
 
   @override
@@ -181,6 +126,7 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final vendorProvider = ref.read(vendorProviderProvider);
+    final unreadCount = ref.watch(unreadCountProvider);
 
     return AppBar(
       backgroundColor: AppTheme.surface,
@@ -213,17 +159,16 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
           children: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined),
-              onPressed: () async {
-                await Navigator.push(
+              onPressed: () {
+                Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const VendorNotificationScreen(),
                   ),
                 );
-                await _loadUnreadNotificationStatus(force: true);
               },
             ),
-            if (_hasUnreadNotifications)
+            if (unreadCount > 0)
               Positioned(
                 right: 10,
                 top: 10,
@@ -376,13 +321,17 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Quick Stats
-                QuickStatsWidget(vendorProvider: vendorProvider),
+                RepaintBoundary(
+                  child: QuickStatsWidget(vendorProvider: vendorProvider),
+                ),
                 const SizedBox(height: 16),
                 _buildCanteenStatusToggle(vendorProvider),
                 const SizedBox(height: 16),
 
                 // Revenue Chart
-                RevenueChartWidget(vendorProvider: vendorProvider),
+                RepaintBoundary(
+                  child: RevenueChartWidget(vendorProvider: vendorProvider),
+                ),
                 const SizedBox(height: 20),
 
                 // Recent Orders
@@ -617,17 +566,19 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
             style: TextStyle(fontSize: 13, color: Colors.grey[600]),
           ),
           const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: cards.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isSmallScreen ? 1 : 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: isSmallScreen ? 2.6 : 2.2,
+          RepaintBoundary(
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cards.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isSmallScreen ? 1 : 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: isSmallScreen ? 2.6 : 2.2,
+              ),
+              itemBuilder: (context, index) => cards[index],
             ),
-            itemBuilder: (context, index) => cards[index],
           ),
           if (latestPayout != null) ...[
             const SizedBox(height: 16),
@@ -664,6 +615,13 @@ class _VendorDashboardScreenState extends ConsumerState<VendorDashboardScreen>
     final day = dateTime.day.toString().padLeft(2, '0');
     final month = dateTime.month.toString().padLeft(2, '0');
     return '$day/$month/${dateTime.year}';
+  }
+
+  Future<void> _loadUnreadNotificationStatus({bool force = false}) async {
+    if (!mounted) return;
+    await ref
+        .read(vendorNotificationProvider.notifier)
+        .loadNotifications(force: force, silent: true);
   }
 }
 
