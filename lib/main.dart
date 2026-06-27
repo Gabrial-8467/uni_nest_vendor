@@ -35,9 +35,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'config/vendor_config.dart';
-import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/cache_service.dart';
 import 'services/permission_service.dart';
@@ -54,7 +54,8 @@ import 'screens/vendor_forgot_password_screen.dart';
 import 'widgets/permission_request_widget.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
     await VendorConfig.initialize();
@@ -126,7 +127,7 @@ class UNINestVendorApp extends StatelessWidget {
       title: VendorConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const PermissionWrapper(child: SplashScreen()),
+      home: const PermissionWrapper(child: VendorAuthGateScreen()),
       routes: {
         '/auth': (context) =>
             const PermissionWrapper(child: VendorAuthGateScreen()),

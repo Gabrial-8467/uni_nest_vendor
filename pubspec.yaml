@@ -74,6 +74,7 @@ dependencies:
   flutter_image_compress: ^2.4.0
   meta: ^1.15.0
   logging: ^1.2.0
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -137,3 +138,14 @@ flutter_launcher_icons:
   min_sdk_android: 21 # android min sdk min:16, default 21
   adaptive_icon_background: "#FFFFFF" # White background
   adaptive_icon_foreground: "assets/images/uninest.jpeg"
+
+flutter_native_splash:
+  color: "#E53935"
+  image: "assets/images/uninest.jpeg"
+  android: true
+  ios: true
+  web: false
+
+  android_12:
+    color: "#E53935"
+    image: "assets/images/uninest.jpeg"

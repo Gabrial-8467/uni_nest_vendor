@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import '../../utils/app_theme.dart';
 import '../providers/auth_provider.dart';
@@ -18,7 +19,15 @@ class _VendorAuthGateScreenState extends ConsumerState<VendorAuthGateScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(authProvider.notifier).bootstrap());
+    Future.microtask(() async {
+      try {
+        await ref.read(authProvider.notifier).bootstrap();
+      } catch (e) {
+        debugPrint('Error during auth bootstrap: $e');
+      } finally {
+        FlutterNativeSplash.remove();
+      }
+    });
   }
 
   @override
