@@ -22,3 +22,13 @@ String humanizeEnum(String value) {
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
 }
+
+String capitalizeWords(String value) {
+  if (value.trim().isEmpty) {
+    return value;
+  }
+  return value
+      .split(' ')
+      .map((part) => part.isEmpty ? '' : '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}

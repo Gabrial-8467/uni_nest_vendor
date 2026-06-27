@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uni_nest_vendor/core/vendor_formatters.dart';
 
 // Location Data Model
 class LocationData {
@@ -123,12 +124,12 @@ class Vendor {
 
     return Vendor(
       id: (json['id'] ?? json['_id'] ?? user['_id'] ?? '').toString(),
-      name: (json['name'] ?? user['name'] ?? '').toString(),
+      name: capitalizeWords((json['name'] ?? user['name'] ?? '').toString()),
       email: (json['email'] ?? contactInfo['email'] ?? user['email'] ?? '')
           .toString(),
       phone: (json['phone'] ?? contactInfo['phone'] ?? user['phone'] ?? '')
           .toString(),
-      businessName: (json['businessName'] ?? '').toString(),
+      businessName: capitalizeWords((json['businessName'] ?? '').toString()),
       businessType: (json['businessType'] ?? '').toString(),
       location: (json['location'] ?? '').toString(),
       locationData: json['location'] is Map

@@ -1,3 +1,5 @@
+import 'package:uni_nest_vendor/core/vendor_formatters.dart';
+
 class PayoutMethod {
   PayoutMethod({
     required this.type,
@@ -112,10 +114,10 @@ class VendorProfile {
         businessDetails['canteenOpen'];
     return VendorProfile(
       id: (json['_id'] ?? json['id'] ?? user['_id'] ?? '').toString(),
-      name: (json['name'] ?? user['name'] ?? '').toString(),
+      name: capitalizeWords((json['name'] ?? user['name'] ?? '').toString()),
       email: (json['email'] ?? contactInfo['email'] ?? user['email'] ?? '')
           .toString(),
-      businessName: (json['businessName'] ?? '').toString(),
+      businessName: capitalizeWords((json['businessName'] ?? '').toString()),
       phone: (json['phone'] ?? contactInfo['phone'] ?? user['phone'] ?? '')
           .toString(),
       businessType: (json['businessType'] ?? '').toString().trim().isEmpty
