@@ -56,12 +56,13 @@ class _VendorForgotPasswordScreenState
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 60),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 60),
 
                 // Header
                 Column(
@@ -265,8 +266,9 @@ class _VendorForgotPasswordScreenState
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
